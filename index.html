@@ -468,8 +468,14 @@ function ceboEsperar(nombre) {
         const listo = (j.beacons || []).filter(b => String(b.marker) === 'H2-CEBO-LISTO' && String(b.extra || '').indexOf('"nombre":"' + nombre + '"') !== -1).pop();
         if (listo) {
           clearInterval(ceboPoll);
-          try { const ex = JSON.parse(listo.extra); if (ex.url) { $('ceboDl').href = ex.url; $('ceboDl').style.display = 'inline-block'; $('ceboRes').textContent = '✓ listo: ' + nombre + ' — descargalo y envialo vos desde el chat'; return; } } catch (e) {}
-          $('ceboRes').textContent = '✓ generado: ' + nombre + ' (link vencido, crea de nuevo)';
+          let estado = '';
+          try { const ex = JSON.parse(listo.extra);
+            if (ex.url) { $('ceboDl').href = ex.url; $('ceboDl').style.display = 'inline-block'; estado = 'descargalo y envialo vos'; }
+            else if (ex.estado === 'error') estado = 'error al fabricar: ' + (ex.motivo || '?');
+            else estado = ex.entregado || 'listo';
+          } catch (e) { estado = 'listo'; }
+          $('ceboRes').textContent = '✓ listo: ' + nombre + ' — ' + estado;
+          $('ceboRes').style.color = '#f2d3d1';
         } else if (intentos > 60) { clearInterval(ceboPoll); $('ceboRes').textContent = 'timeout esperando el archivo, reintenta'; }
       }).catch(e => {});
   }, 3000);
