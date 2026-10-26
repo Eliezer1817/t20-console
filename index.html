@@ -348,7 +348,7 @@ footer .sep{color:#262b33}
     </div></div>
     <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>USUARIOS IDENTIFICADOS</h2><span class="meta" id="h2UsersN">0</span></div>
     <div class="panel"><div class="log" id="h2Users"><div style="font-size:9px;color:#5c626c;padding:8px 10px">cada dispositivo/usuario que reporte al C2 aparece acá con su huella única</div></div></div>
-    <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>EVENTOS DE DETONACIÓN</h2><span class="meta" id="h2Cnt">0</span></div>
+    <div class="sech" style="margin-top:10px"><div class="sq"></div><h2>EVENTOS DE DETONACIÓN</h2><span class="meta" id="h2Cnt">0</span><span class="vac" onclick="h2ToggleVer()" id="h2VerBtn" style="margin-left:8px">VER TODO</span><span class="vac" onclick="h2LimpiarOcultos()" style="margin-left:8px">RESTAURAR ✕</span></div>
     <div class="panel"><div class="log" id="h2List"><div style="font-size:9px;color:#5c626c;padding:8px 10px">cada máquina que detona aparece agrupada por HOST · USUARIO real (una PC = una fila, sin colisiones)</div></div></div>
     <div class="panel" style="margin-top:10px"><div style="font-size:9px;color:#8b919b;line-height:1.7;padding:2px 4px">
       SENSOR: la entrega (E1) es invisible por diseño — nadie puede ver cuándo llegó. La primera señal del sistema es la ejecución (E3).<br>
@@ -361,7 +361,7 @@ footer .sep{color:#262b33}
   <span>SYNC <b id="ftSync">--:--:--</b></span><span class="sep">|</span>
   <span>BEACONS <b id="ftB">0</b></span><span class="sep">|</span>
   <span>UPTIME <b id="ftU">00:00:00</b></span><span class="sep">|</span>
-  <span id="ftVer">RC-T20 vRC19 · MOTOR CLONE v13.4</span>
+  <span id="ftVer">RC-T20 vRC20 · MOTOR CLONE v13.4</span>
 </footer>
 <div id="modal">
   <div class="mbox">
@@ -522,18 +522,45 @@ function renderH2() {
     uEl.innerHTML = grupo('▸ CUENTAS LAB REALES', reales, '')
       + grupo('▸ INFRAESTRUCTURA / TEST', infra, '(sintéticas, no son personas)');
   }
-  $('h2List').innerHTML = S.h2.slice().reverse().map(e => {
-    const ex = String(e.ex || '');
-    let host = '', user = '';
-    ex.split('|').forEach(p => { const k = p.split('=')[0], v = p.split('=').slice(1).join('=');
-      if (k === 'host') host = v; if (k === 'user') user = v; });
-    const isExec = String(e.m).indexOf('H2-EXEC') === 0;
-    const neg = /(NEGADO|PERMITIDO)/.test(e.m);
-    return '<div style="border:1px solid #000;border-left:2px solid ' + (isExec ? 'var(--red)' : (neg ? '#6b6f76' : '#7a4a45')) + ';background:linear-gradient(180deg,' + (isExec ? '#231818,#191212' : '#17191d,#121418') + ');margin:6px 0;padding:8px 10px;border-radius:2px">'
-      + '<b style="color:' + (isExec ? '#f2d3d1' : '#d8dbe0') + ';font-size:10px;letter-spacing:1px">' + esc(e.m) + '</b> <span style="font-size:8.5px;color:#7a4a45;border:1px solid #3a2624;padding:1px 5px;border-radius:2px">' + esc(e.id || '') + '</span>'
-      + '<div style="font-size:9px;color:#a8adb5;margin-top:4px">' + esc(host ? (host + ' · ' + user) : ex) + '</div>'
-      + '<div style="font-size:8px;color:#5c626c;margin-top:3px">' + esc(e.at) + '</div></div>';
-  }).join('');
+  const h2Det = e => /^H2-(LNK|KEYS|EXEC|ST|OPEN)/.test(String(e.m||''));
+  const h2Ocultos = JSON.parse(localStorage.getItem('h2hid') || '[]');
+  const vis = S.h2.filter(e => !h2Ocultos.includes(e.bid));
+  const dets = vis.filter(h2Det);
+  S.h2All = (localStorage.getItem('h2all') === '1');
+  const lista = (S.h2All ? vis : dets).slice().reverse();
+  $('h2Cnt').textContent = dets.length + (dets.length === 1 ? ' detonación' : ' detonaciones') + (vis.length !== dets.length ? ' · ' + (vis.length - dets.length) + ' infra' : '');
+  const hEl = $('h2List');
+  if (!lista.length) {
+    hEl.innerHTML = '<div style="font-size:9px;color:#5c626c;padding:8px 10px">' + (S.h2All ? 'sin eventos' : 'sin detonaciones — las señales de fábrica/infra no se muestran acá') + '</div>';
+  } else {
+    hEl.innerHTML = lista.map(e => {
+      const ex = String(e.ex || '');
+      let host = '', user = '';
+      ex.split('|').forEach(p => { const k = p.split('=')[0], v = p.split('=').slice(1).join('=');
+        if (k === 'host') host = v; if (k === 'user') user = v; });
+      const isExec = String(e.m).indexOf('H2-EXEC') === 0;
+      const esDet = h2Det(e);
+      const neg = /(NEGADO|PERMITIDO)/.test(e.m);
+      return '<div style="border:1px solid #000;border-left:2px solid ' + (isExec ? 'var(--red)' : (esDet ? '#7a4a45' : '#6b6f76')) + ';background:linear-gradient(180deg,' + (isExec ? '#231818,#191212' : '#17191d,#121418') + ');margin:6px 0;padding:8px 10px;border-radius:2px;position:relative">'
+        + '<span onclick="h2Hide(\'' + esc(e.bid) + '\')" style="position:absolute;top:4px;right:6px;cursor:pointer;color:#5c626c;font-size:11px;padding:2px 4px">✕</span>'
+        + '<b style="color:' + (isExec ? '#f2d3d1' : '#d8dbe0') + ';font-size:10px;letter-spacing:1px">' + esc(e.m) + '</b> <span style="font-size:8.5px;color:#7a4a45;border:1px solid #3a2624;padding:1px 5px;border-radius:2px">' + esc(e.id || '') + '</span>'
+        + '<div style="font-size:9px;color:#a8adb5;margin-top:4px">' + esc(host ? (host + ' · ' + user) : ex) + '</div>'
+        + '<div style="font-size:8px;color:#5c626c;margin-top:3px">' + esc(e.at) + '</div></div>';
+    }).join('');
+  }
+}
+function h2Hide(bid) {
+  const h = JSON.parse(localStorage.getItem('h2hid') || '[]');
+  if (!h.includes(bid)) { h.push(bid); localStorage.setItem('h2hid', JSON.stringify(h)); }
+  renderH2();
+}
+function h2ToggleVer() {
+  localStorage.setItem('h2all', S.h2All ? '0' : '1');
+  renderH2();
+}
+function h2LimpiarOcultos() {
+  localStorage.removeItem('h2hid');
+  renderH2();
 }
 function processBeacon(b) {
   if (S.seen.has(b.id)) return false;
@@ -541,7 +568,8 @@ function processBeacon(b) {
   S.raw.push({id:b.id, marker:b.marker, phone:b.phone, vname:b.vname, ua:b.ua, username:b.username, osys:b.osys, tz:b.tz, premium:b.premium, dc2:b.dc2_present, dc3:b.dc3_present, lskeys:b.ls_keys, origin:b.origin, created:b.created_date, extra_len:String(b.extra||'').length, extra:b.extra});
   if (String(b.marker||'').indexOf('H2-') === 0) {
     const ident = (b.phone ? ('+' + String(b.phone)) : '') || (b.username || '') || ((String(b.extra||'').match(/host=([^|]+)/) || [])[1] || '') || (String(b.ua||'').split(')')[0] + (b.ua ? ')' : '')) || 'desconocido';
-    S.h2.push({ m: b.marker, ex: String(b.extra||''), at: now(), id: ident });
+    const _fd = (cd) => { try { const d = new Date(cd); return isNaN(d) ? now() : d.toLocaleString('es-PY', {hour12:false}); } catch(e) { return now(); } };
+    S.h2.push({ m: b.marker, ex: String(b.extra||''), at: _fd(b.created_date), id: ident, bid: b.id });
     renderH2();
     return true;
   }
@@ -944,7 +972,7 @@ setInterval(() => {
 }, 1000);
 
 applyOp(localStorage.getItem('t20v8_op') || 't20');
-logAdd('RC-T20 vRC19 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
+logAdd('RC-T20 vRC20 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
 renderAll();
 poll();
 </script>
