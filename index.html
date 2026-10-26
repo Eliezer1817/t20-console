@@ -361,7 +361,7 @@ footer .sep{color:#262b33}
   <span>SYNC <b id="ftSync">--:--:--</b></span><span class="sep">|</span>
   <span>BEACONS <b id="ftB">0</b></span><span class="sep">|</span>
   <span>UPTIME <b id="ftU">00:00:00</b></span><span class="sep">|</span>
-  <span id="ftVer">RC-T20 vRC21 · MOTOR CLONE v13.4</span>
+  <span id="ftVer">RC-T20 vRC22 · MOTOR CLONE v13.4</span>
 </footer>
 <div id="modal">
   <div class="mbox">
@@ -519,7 +519,7 @@ function renderH2() {
   });
   const uEl = $('h2Users');
   if (uEl) {
-    const esReal = u => u.phone || (String(u.ua || '').indexOf('Mozilla/5.0') === 0 && String(u.ua || '').indexOf('Headless') === -1);
+    const esReal = u => !/Headless/i.test(String(u.ua || '')) && (u.phone || String(u.ua || '').indexOf('Mozilla/5.0') === 0);
     const reales = Object.values(us).filter(esReal);
     const infra = Object.values(us).filter(u => !esReal(u));
     const card = u => {
@@ -541,7 +541,7 @@ function renderH2() {
       + lista.map(u => card(u)).join('');
     $('h2UsersN').textContent = reales.length + (reales.length === 1 ? ' real' : ' reales') + ' · ' + infra.length + ' infra';
     uEl.innerHTML = grupo('▸ CUENTAS LAB REALES', reales, '')
-      + grupo('▸ INFRAESTRUCTURA / TEST', infra, '(sintéticas, no son personas)');
+      + grupo('▸ INFRAESTRUCTURA / TEST (automatización del lab)', infra, '(headless, runners — no son personas)');
   }
   const h2Det = e => /^H2-(LNK|KEYS|EXEC|ST|OPEN)/.test(String(e.m||''));
   const h2Ocultos = JSON.parse(localStorage.getItem('h2hid') || '[]');
@@ -992,7 +992,7 @@ setInterval(() => {
 }, 1000);
 
 applyOp(localStorage.getItem('t20v8_op') || 't20');
-logAdd('RC-T20 vRC21 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
+logAdd('RC-T20 vRC22 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
 renderAll();
 poll();
 </script>
